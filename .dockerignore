@@ -1,0 +1,10 @@
+.git
+.codex
+.astro
+dist
+node_modules
+.env
+.env.*
+supabase
+npm-debug.log*
+pnpm-debug.log*

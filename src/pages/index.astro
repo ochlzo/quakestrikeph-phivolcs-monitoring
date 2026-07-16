@@ -1,11 +1,73 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
+import { getForecastQueue, type ForecastCase } from '../lib/portal-data';
+import { REVIEW_STATUS_LABELS } from '../lib/reviews';
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+const PHT = new Intl.DateTimeFormat('en-PH', {
+	dateStyle: 'medium',
+	timeStyle: 'short',
+	timeZone: 'Asia/Manila',
+});
+const PERCENT = new Intl.NumberFormat('en-PH', { style: 'percent', maximumFractionDigits: 1 });
+
+let forecasts: ForecastCase[] = [];
+let loadError = '';
+try {
+	forecasts = await getForecastQueue();
+} catch (error) {
+	loadError = error instanceof Error ? error.message : 'The forecast queue could not be loaded.';
+}
+
+const pending = forecasts.filter(({ review }) => !review || review.status === 'PENDING_REVIEW' || review.status === 'DRAFT');
+const reviewed = forecasts.length - pending.length;
+const statusOf = ({ review }: ForecastCase) => review?.status ?? 'PENDING_REVIEW';
+const probability = (value: number | null) => value === null ? 'Unavailable' : PERCENT.format(value);
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="Forecast monitor">
+	<section class="page-heading">
+		<div>
+			<p class="eyebrow">Operations queue</p>
+			<h1>Forecast monitoring</h1>
+			<p>Review current probability estimates before recording an assessment or preparing an alert.</p>
+		</div>
+		<div class="freshness"><span aria-hidden="true"></span>Server-rendered current data</div>
+	</section>
+
+	<section class="stat-grid" aria-label="Queue summary">
+		<div class="stat"><span>Current forecasts</span><strong>{forecasts.length}</strong></div>
+		<div class="stat"><span>Pending or draft</span><strong>{pending.length}</strong></div>
+		<div class="stat"><span>Reviewed</span><strong>{reviewed}</strong></div>
+	</section>
+
+	{loadError ? (
+		<div class="notice notice-error" role="alert">
+			<strong>Forecast queue unavailable</strong>
+			<p>{loadError}</p>
+			<p>Confirm the server-only Supabase variables and apply the included review migration.</p>
+		</div>
+	) : (
+		<section class="panel">
+			<div class="panel-heading"><div><p class="eyebrow">Current revisions</p><h2>Review queue</h2></div><span>{forecasts.length} records</span></div>
+			{forecasts.length ? (
+				<div class="forecast-list">
+					{forecasts.map((item) => {
+						const status = statusOf(item);
+						return (
+							<article class="forecast-row">
+								<div class="event-magnitude">M{item.event.Magnitude.toFixed(1)}</div>
+								<div class="event-summary">
+									<h3>{item.event.Location ?? 'Location unavailable'}</h3>
+									<p>{PHT.format(new Date(item.event.event_time ?? item.forecast.created_at))} PHT · {item.event.Depth} km deep</p>
+								</div>
+								<div class="forecast-metric"><span>Aftershock within 24h</span><strong>{probability(item.forecast.aftershock_24h)}</strong></div>
+								<span class="status-badge" data-status={status}>{REVIEW_STATUS_LABELS[status]}</span>
+								<a class="button button-secondary" href={`/reviews/${encodeURIComponent(item.event.id)}`}>Open review</a>
+							</article>
+						);
+					})}
+				</div>
+			) : <div class="empty-state"><strong>No forecasts found</strong><p>New forecasts will appear here after prediction processing completes.</p></div>}
+		</section>
+	)}
 </Layout>

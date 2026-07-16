@@ -1,0 +1,134 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getForecastCase, saveForecastReview } from '../../lib/portal-data';
+import {
+	parseReviewInput,
+	REVIEW_STATUSES,
+	REVIEW_STATUS_LABELS,
+	REVIEW_TEMPLATES,
+} from '../../lib/reviews';
+
+const eventId = Astro.params.eventId;
+if (!eventId) return Astro.redirect('/');
+
+let actionError = '';
+if (Astro.request.method === 'POST') {
+	try {
+		const formData = await Astro.request.formData();
+		const forecastCreatedAt = formData.get('forecast_created_at');
+		if (typeof forecastCreatedAt !== 'string' || !forecastCreatedAt) {
+			throw new Error('Forecast revision is missing. Reload this page and try again.');
+		}
+		await saveForecastReview(
+			eventId,
+			forecastCreatedAt,
+			Astro.locals.user.email,
+			parseReviewInput(formData),
+			Astro.url.pathname,
+		);
+		return Astro.redirect(`/reviews/${encodeURIComponent(eventId)}?saved=1`, 303);
+	} catch (error) {
+		actionError = error instanceof Error ? error.message : 'The review could not be saved.';
+	}
+}
+
+let forecastCase = null;
+let loadError = '';
+try {
+	forecastCase = await getForecastCase(eventId);
+} catch (error) {
+	loadError = error instanceof Error ? error.message : 'The forecast could not be loaded.';
+}
+if (!forecastCase && !loadError) Astro.response.status = 404;
+
+const PHT = new Intl.DateTimeFormat('en-PH', {
+	dateStyle: 'medium',
+	timeStyle: 'short',
+	timeZone: 'Asia/Manila',
+});
+const PERCENT = new Intl.NumberFormat('en-PH', { style: 'percent', maximumFractionDigits: 1 });
+const probability = (value: number | null) => value === null ? 'Unavailable' : PERCENT.format(value);
+const status = forecastCase?.review?.status ?? 'PENDING_REVIEW';
+const distanceBands = forecastCase ? [
+	['Within 10 km', forecastCase.forecast.within_10km],
+	['10–25 km', forecastCase.forecast.between_10_25km],
+	['25–50 km', forecastCase.forecast.between_25_50km],
+	['Beyond 50 km', forecastCase.forecast.beyond_50km],
+] as const : [];
+---
+
+<Layout title="Forecast review">
+	<a class="back-link" href="/">← Back to forecast queue</a>
+	{loadError ? (
+		<div class="notice notice-error" role="alert"><strong>Forecast unavailable</strong><p>{loadError}</p></div>
+	) : !forecastCase ? (
+		<div class="notice"><strong>Forecast not found</strong><p>No current forecast exists for this event.</p></div>
+	) : (
+		<>
+			<section class="page-heading review-heading">
+				<div><p class="eyebrow">Forecast review</p><h1>M{forecastCase.event.Magnitude.toFixed(1)} · {forecastCase.event.Location ?? 'Location unavailable'}</h1><p>Forecast generated {PHT.format(new Date(forecastCase.forecast.created_at))} PHT</p></div>
+				<span class="status-badge" data-status={status}>{REVIEW_STATUS_LABELS[status]}</span>
+			</section>
+
+			{Astro.url.searchParams.has('saved') && <div class="notice notice-success" role="status">Review saved successfully.</div>}
+			{actionError && <div class="notice notice-error" role="alert">{actionError}</div>}
+
+			<div class="review-grid">
+				<div class="review-context">
+					<section class="panel details-panel">
+						<div class="panel-heading"><div><p class="eyebrow">Source event</p><h2>Trigger details</h2></div></div>
+						<dl class="details-grid">
+							<div><dt>Magnitude</dt><dd>M{forecastCase.event.Magnitude.toFixed(1)}</dd></div>
+							<div><dt>Depth</dt><dd>{forecastCase.event.Depth} km</dd></div>
+							<div><dt>Event time</dt><dd>{PHT.format(new Date(forecastCase.event.event_time ?? forecastCase.forecast.created_at))} PHT</dd></div>
+							<div><dt>Coordinates</dt><dd>{forecastCase.event.Latitude.toFixed(3)}, {forecastCase.event.Longitude.toFixed(3)}</dd></div>
+						</dl>
+					</section>
+
+					<section class="panel details-panel">
+						<div class="panel-heading"><div><p class="eyebrow">Model output</p><h2>24-hour probability estimates</h2></div></div>
+						<div class="probability-grid">
+							<div class="probability-card primary"><span>At least one aftershock</span><strong>{probability(forecastCase.forecast.aftershock_24h)}</strong><small>{forecastCase.forecast.aftershock_24h_likelihood_level ?? 'No likelihood label'}</small></div>
+							<div class="probability-card"><span>M5+ aftershock</span><strong>{probability(forecastCase.forecast.m5_plus_aftershock)}</strong><small>{forecastCase.forecast.m5_plus_likelihood_level ?? 'No likelihood label'}</small></div>
+							<div class="probability-card"><span>Estimated strongest</span><strong>{forecastCase.forecast.est_max_aftershock === null ? 'Unavailable' : `M${forecastCase.forecast.est_max_aftershock.toFixed(1)}`}</strong></div>
+						</div>
+						<dl class="distance-list">{distanceBands.map(([label, value]) => <div><dt>{label}</dt><dd>{probability(value)}</dd></div>)}</dl>
+						<p class="disclaimer">These are probability estimates, not deterministic earthquake predictions. Observed events must be described as possibly related screened earthquakes, not confirmed aftershocks.</p>
+					</section>
+				</div>
+
+				<form class="panel review-form" method="post">
+					<input type="hidden" name="forecast_created_at" value={forecastCase.forecast.created_at} />
+					<div class="panel-heading"><div><p class="eyebrow">PHIVOLCS review</p><h2>Record assessment</h2></div></div>
+					<label for="status">Review status</label>
+					<select id="status" name="status" required>
+						{REVIEW_STATUSES.map((value) => <option value={value} selected={value === status}>{REVIEW_STATUS_LABELS[value]}</option>)}
+					</select>
+
+					<label for="review-template">Pre-written assessment</label>
+					<select id="review-template">
+						<option value="">Select text to copy into the review…</option>
+						{REVIEW_TEMPLATES.map((template) => <option value={template.text}>{template.label}</option>)}
+					</select>
+
+					<label for="review-text">Review text</label>
+					<textarea id="review-text" name="review_text" rows="9" maxlength="5000" placeholder="Select a template or write an assessment.">{forecastCase.review?.review_text}</textarea>
+					<p class="field-hint">Template text remains fully editable before saving. Completed reviews require assessment text.</p>
+
+					<label for="internal-note">Internal note</label>
+					<textarea id="internal-note" name="internal_note" rows="4" maxlength="5000" placeholder="Visible only inside this private portal.">{forecastCase.review?.internal_note}</textarea>
+					<button class="button button-primary" type="submit">Save review</button>
+					{status === 'REVIEWED_FOR_ALERT' && <p class="field-hint">Alert delivery is intentionally deferred until recipient and provider contracts are defined.</p>}
+				</form>
+			</div>
+		</>
+	)}
+</Layout>
+
+<script>
+	const template = document.querySelector<HTMLSelectElement>('#review-template');
+	const review = document.querySelector<HTMLTextAreaElement>('#review-text');
+	template?.addEventListener('change', () => {
+		if (template.value && review) review.value = template.value;
+	});
+</script>

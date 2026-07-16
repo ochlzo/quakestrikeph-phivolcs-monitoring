@@ -1,23 +1,33 @@
+---
+import '../styles/global.css';
+
+interface Props {
+	title?: string;
+}
+
+const { title = 'Forecast monitor' } = Astro.props;
+const operatorEmail = Astro.locals.user?.email;
+---
+
 <!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<link rel="icon" href="/favicon.ico" />
 		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
+		<meta name="robots" content="noindex, nofollow" />
+		<title>{title} · QuakeStrike PH</title>
 	</head>
 	<body>
-		<slot />
+		<header class="topbar">
+			<a class="brand" href="/" aria-label="QuakeStrike PH forecast monitor">
+				<span class="brand-mark" aria-hidden="true">QS</span>
+				<span><strong>QuakeStrike PH</strong><small>PHIVOLCS forecast monitor</small></span>
+			</a>
+			{operatorEmail && <div class="operator"><span>Authenticated operator</span><strong>{operatorEmail}</strong></div>}
+		</header>
+		<main class="page-shell"><slot /></main>
+		<footer class="footer">Private operations portal · All operational timestamps use Philippine Time</footer>
 	</body>
 </html>
-
-<style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
-</style>
