@@ -6,6 +6,43 @@ This project is the private QuakeStrike PH monitoring portal for personnel deleg
 
 It is a separate internal application, not a hidden route in the public `quakestrikeph-frontend` website. The public frontend may be consulted for existing map, forecast-discussion, playback, and terminology patterns, but access control and operational actions belong here.
 
+## Current implementation baseline
+
+The repository currently contains a working first review slice:
+
+- Astro SSR with the standalone Node adapter
+- a server-rendered forecast queue backed by Supabase
+- a forecast review page with editable pre-written assessments
+- review statuses `PENDING_REVIEW`, `DRAFT`, `REVIEWED_NO_ALERT`, and `REVIEWED_FOR_ALERT`
+- server-side review persistence and audit logging
+- Cloudflare Access JWT validation in Astro middleware
+- Docker Compose services for the Astro app and a remotely managed Cloudflare Tunnel
+
+The app and tunnel can run on a developer workstation before a VPS exists. The tunnel route is `http://app:4321` because `app` is the Docker Compose service name. No public IP, A record, router port forwarding, or host port is required. When the VPS is ready, stop the local connector and run the same Compose stack there; the Cloudflare hostname and tunnel route do not need to change.
+
+The current Cloudflare login method is email one-time PIN for testing. Cloudflare settings and secrets are external state and are not committed. Do not assume the current Access policy, tunnel health, remote migration state, or secret values from repository files; verify them when relevant.
+
+## Implemented versus deferred
+
+Implemented now:
+
+- current forecast queue from `SeisPredictions_v1` joined to `RawEarthquakeEvents`
+- current-revision review loading and saving
+- editable review templates and internal notes
+- superseded-revision rejection before saving
+- reviewer attribution from the verified Cloudflare Access JWT
+- audit rows for successful review mutations
+
+Still deferred:
+
+- live map, playback observations, and full source-freshness indicators
+- alert composer, recipients, delivery channels, confirmation, retries, and corrections
+- alert history and delivery-result screens
+- organization IdP integration, independent MFA, and PHIVOLCS CIDR/VPN enforcement
+- UI refinement beyond the functional review workflow
+
+`REVIEWED_FOR_ALERT` is only a review state. It does not send an alert. Do not invent an alert provider, recipient model, or delivery contract to advance this state.
+
 ## Product scope
 
 PHIVOLCS operators may:
@@ -96,6 +133,32 @@ Sending an alert does not require another PHIVOLCS approver. Keep a final confir
 - Never expose server credentials, database connection strings, or service-role keys to browser code or logs.
 - All review and alert mutations must be attributable to the authenticated operator.
 
+### Current security mechanics
+
+- `src/middleware.ts` protects every application route except `/healthz`.
+- `src/lib/cloudflare-access.ts` validates `Cf-Access-Jwt-Assertion` with Cloudflare JWKS and checks signature, issuer, audience, expiry, and email. Never replace this with trust in `Cf-Access-Authenticated-User-Email` alone.
+- Missing or invalid Access identity returns `401 Unauthorized`.
+- A mutation whose `Origin` does not exactly match `PORTAL_ORIGIN` returns `403 Forbidden`.
+- `PORTAL_ORIGIN` must be the exact browser origin. Use the public HTTPS hostname through the tunnel and `http://localhost:4321` only for local `pnpm dev`.
+- `DEV_AUTH_EMAIL` is a local-development override only. Production Compose runs with `NODE_ENV=production` and does not pass it to the app. Never add it to the production service environment.
+- The Compose `app` service uses `expose`, not `ports`; keep it unreachable from host ports.
+- The runtime image runs as the non-root `node` user.
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only. Reject `sb_publishable_` keys and never add a browser Supabase client unless a separately reviewed use case requires it.
+- `/healthz` intentionally bypasses Astro identity checks for the internal container health check. The public hostname must still be covered by the Access application.
+
+For OTP policies, allow explicit operator email addresses. Do not use `Include -> Everyone`, `Include -> Login Methods -> One-time PIN`, or broad `Bypass` policies. OTP is acceptable for testing; production still requires independent MFA or an organization IdP with MFA plus the approved PHIVOLCS network restriction.
+
+## Data contract
+
+- Source tables already expected in Supabase: `RawEarthquakeEvents` and `SeisPredictions_v1`.
+- Portal migration: `supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql`.
+- `forecast_reviews` is unique on `(event_id, forecast_created_at)`, preserving a separate review per forecast revision.
+- `audit_logs` records the authenticated email, path, method, timestamp, and mutation metadata.
+- Both portal tables have RLS enabled with no browser policies. Access is intentionally through server-side Supabase credentials only.
+- Review and query logic belongs in `src/lib/portal-data.ts`, not in UI components.
+
+Do not assume that the migration file has been applied to the linked remote project. Check migration history or the live schema before debugging review persistence.
+
 ## Integration boundaries
 
 - `C:\Projects\quakestrikeph-frontend` is the reference for the existing public map and forecast-discussion experience.
@@ -115,20 +178,32 @@ Sending an alert does not require another PHIVOLCS approver. Keep a final confir
 
 ## Development
 
+Prerequisites are Node.js 22.12 or newer, pnpm 11 through Corepack, and Docker Desktop or another Docker Compose-compatible runtime.
+
 Install and verify with the existing package scripts:
 
 ```powershell
+corepack enable
 pnpm install
-pnpm run build
+pnpm test
+pnpm check
+pnpm build
 ```
 
-Run the development server in background mode:
+For local UI work, copy `.env.example` to `.env`, use `PORTAL_ORIGIN=http://localhost:4321`, set a non-production `DEV_AUTH_EMAIL`, and run:
 
 ```powershell
-astro dev --background
-astro dev status
-astro dev logs
-astro dev stop
+pnpm dev
 ```
 
-Astro documentation: https://docs.astro.build
+For the real Cloudflare path, use the public HTTPS origin, valid Cloudflare and Supabase values, and run:
+
+```powershell
+docker compose --env-file .env up --build -d
+docker compose ps
+docker compose logs cloudflared --tail 100
+```
+
+Expected production port output is `4321/tcp`, never `0.0.0.0:4321->4321/tcp`.
+
+Before changing authentication, data access, migrations, or deployment, read `README.md`, inspect the current Compose and middleware files, and preserve the security properties above. After changes, run the smallest relevant check and normally finish with `pnpm test`, `pnpm check`, and `pnpm build`.
