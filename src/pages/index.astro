@@ -8,8 +8,11 @@ import { getOperatorProfile } from '../lib/portal-data';
 const operatorEmail = Astro.locals.user?.email ?? '';
 let operatorDisplayName = '';
 if (operatorEmail) {
-  try { operatorDisplayName = (await getOperatorProfile(operatorEmail))?.display_name ?? ''; }
-  catch { operatorDisplayName = ''; }
+  try {
+    operatorDisplayName = (await getOperatorProfile(operatorEmail))?.display_name ?? '';
+  } catch {
+    operatorDisplayName = '';
+  }
 }
 ---
 

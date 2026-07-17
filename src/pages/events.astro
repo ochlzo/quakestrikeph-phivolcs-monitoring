@@ -6,19 +6,28 @@ import TableToolbar from '@/components/table-toolbar.astro';
 import { buttonVariants } from '@/components/ui/button';
 import { getRawEventPage, type EventRow } from '@/lib/portal-data';
 import { MAGNITUDE_RANGE_OPTIONS, magnitudeSelectionsToRanges } from '@/lib/magnitude-ranges';
-import { allowedValues, dateParam, optionalNumberParam, parseTableRequest } from '@/lib/table-query';
+import {
+  allowedValues,
+  dateParam,
+  optionalNumberParam,
+  parseTableRequest,
+} from '@/lib/table-query';
 
 const request = parseTableRequest(Astro.url);
 const params = Astro.url.searchParams;
-const magnitudeValues = allowedValues(params, 'magnitude', MAGNITUDE_RANGE_OPTIONS.map(({ value }) => value));
+const magnitudeValues = allowedValues(
+  params,
+  'magnitude',
+  MAGNITUDE_RANGE_OPTIONS.map(({ value }) => value),
+);
 const depthFrom = optionalNumberParam(params, 'depth_from');
 const depthTo = optionalNumberParam(params, 'depth_to');
 const dateFrom = dateParam(params, 'date_from');
 const dateTo = dateParam(params, 'date_to');
 const activeFilterCount = [
-	magnitudeValues.length > 0,
-	depthFrom !== null || depthTo !== null,
-	dateFrom !== null || dateTo !== null,
+  magnitudeValues.length > 0,
+  depthFrom !== null || depthTo !== null,
+  dateFrom !== null || dateTo !== null,
 ].filter(Boolean).length;
 let page = request.page;
 let rows: EventRow[] = [];
@@ -26,88 +35,196 @@ let total = 0;
 let error = '';
 
 async function load(offset: number) {
-	return getRawEventPage({
-		query: request.query,
-		magnitudeRanges: magnitudeSelectionsToRanges(magnitudeValues),
-		depthFrom,
-		depthTo,
-		dateFrom,
-		dateTo,
-		limit: request.limit,
-		offset,
-	});
+  return getRawEventPage({
+    query: request.query,
+    magnitudeRanges: magnitudeSelectionsToRanges(magnitudeValues),
+    depthFrom,
+    depthTo,
+    dateFrom,
+    dateTo,
+    limit: request.limit,
+    offset,
+  });
 }
 try {
-	({ rows, total } = await load(request.offset));
-	const lastPage = Math.max(1, Math.ceil(total / request.limit));
-	if (page > lastPage) {
-		page = lastPage;
-		({ rows, total } = await load((page - 1) * request.limit));
-	}
+  ({ rows, total } = await load(request.offset));
+  const lastPage = Math.max(1, Math.ceil(total / request.limit));
+  if (page > lastPage) {
+    page = lastPage;
+    ({ rows, total } = await load((page - 1) * request.limit));
+  }
 } catch (reason) {
-	error = reason instanceof Error ? reason.message : 'Could not load raw events.';
+  error = reason instanceof Error ? reason.message : 'Could not load raw events.';
 }
 
 const resetParams = new URLSearchParams({ limit: String(request.limit) });
 if (request.query) resetParams.set('q', request.query);
 const resetHref = `/events?${resetParams}`;
-const PHT = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' });
-const fieldClass = 'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+const PHT = new Intl.DateTimeFormat('en-PH', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Manila',
+});
+const fieldClass =
+  'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 ---
 
 <Layout title="Raw events">
-	<main class="flex-1 p-4 sm:p-6">
-		<div class="mx-auto max-w-7xl space-y-5">
-			<header>
-				<p class="text-xs font-semibold uppercase tracking-wide text-primary">Catalog</p>
-				<h1 class="text-2xl font-semibold">Raw earthquake events</h1>
-				<p class="text-sm text-muted-foreground">Read-only source records. Operators cannot edit or delete catalog events.</p>
-			</header>
-			{error ? (
-				<div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">{error}</div>
-			) : (
-				<section class="overflow-hidden rounded-xl border bg-card shadow-sm">
-					<TableToolbar url={Astro.url} query={request.query} placeholder="Search location or event ID" pageSize={request.limit}>
-						<TableFilterMenu client:load title="Filter raw events" description="Narrow catalog events by magnitude, depth, and date." activeFilterCount={activeFilterCount}>
-							<form method="get">
-								<input type="hidden" name="q" value={request.query} />
-								<input type="hidden" name="limit" value={request.limit} />
-								<input type="hidden" name="applied" value="1" />
-								<input type="hidden" name="page" value="1" />
-								<div class="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto p-4 text-sm">
-								<fieldset class="space-y-2">
-									<legend class="font-semibold">Magnitude</legend>
-									<div class="grid grid-cols-2 gap-2">
-										{MAGNITUDE_RANGE_OPTIONS.map((option) => <label class="flex items-center gap-2"><input type="checkbox" name="magnitude" value={option.value} checked={magnitudeValues.includes(option.value)} /><span class={`size-2.5 rounded-full ${option.colorClass}`}></span>{option.label}</label>)}
-									</div>
-								</fieldset>
-								<fieldset>
-									<legend class="mb-2 font-semibold">Depth (km)</legend>
-									<div class="grid grid-cols-2 gap-2"><input class={fieldClass} type="number" min="0" max={depthTo ?? undefined} name="depth_from" value={depthFrom ?? ''} placeholder="From" /><input class={fieldClass} type="number" min={depthFrom ?? 0} name="depth_to" value={depthTo ?? ''} placeholder="To" /></div>
-								</fieldset>
-								<fieldset>
-									<legend class="mb-2 font-semibold">Date range</legend>
-									<div class="grid grid-cols-2 gap-2"><input class={fieldClass} type="date" name="date_from" value={dateFrom ?? ''} max={dateTo ?? undefined} aria-label="Date from" /><input class={fieldClass} type="date" name="date_to" value={dateTo ?? ''} min={dateFrom ?? undefined} aria-label="Date to" /></div>
-								</fieldset>
-								</div>
-								<footer class="grid grid-cols-2 gap-2 border-t p-2">
-									<a href={resetHref} class={buttonVariants({ variant: 'outline', size: 'sm' })}>Reset filters</a>
-									<button class={buttonVariants({ size: 'sm' })}>Apply filters</button>
-								</footer>
-							</form>
-						</TableFilterMenu>
-					</TableToolbar>
-					<div class="overflow-x-auto">
-								<table class="w-full text-left text-sm">
-									<thead class="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th class="p-3">Magnitude</th><th class="p-3">Location</th><th class="p-3">Event time</th><th class="p-3">Depth</th><th class="p-3">Coordinates</th></tr></thead>
-									<tbody class="divide-y">
-										{rows.length ? rows.map((event) => <tr><td class="p-3 font-semibold text-primary">M{event.Magnitude.toFixed(1)}</td><td class="p-3"><strong>{event.Location ?? 'Unknown location'}</strong><span class="block text-xs text-muted-foreground">{event.id}</span></td><td class="p-3 whitespace-nowrap">{PHT.format(new Date(event.event_time ?? event['Date-Time']))} PHT</td><td class="p-3">{event.Depth} km</td><td class="p-3 tabular-nums">{event.Latitude.toFixed(3)}, {event.Longitude.toFixed(3)}</td></tr>) : <tr><td colspan="5" class="p-8 text-center text-muted-foreground">No events match the current search and filters.</td></tr>}
-									</tbody>
-								</table>
-					</div>
-					<TablePagination url={Astro.url} total={total} page={page} pageSize={request.limit} />
-				</section>
-			)}
-		</div>
-	</main>
+  <main class="flex-1 p-4 sm:p-6">
+    <div class="mx-auto max-w-7xl space-y-5">
+      <header>
+        <p class="text-xs font-semibold uppercase tracking-wide text-primary">Catalog</p>
+        <h1 class="text-2xl font-semibold">Raw earthquake events</h1>
+        <p class="text-sm text-muted-foreground">
+          Read-only source records. Operators cannot edit or delete catalog events.
+        </p>
+      </header>
+      {
+        error ? (
+          <div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">
+            {error}
+          </div>
+        ) : (
+          <section class="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <TableToolbar
+              url={Astro.url}
+              query={request.query}
+              placeholder="Search location or event ID"
+              pageSize={request.limit}
+            >
+              <TableFilterMenu
+                client:load
+                title="Filter raw events"
+                description="Narrow catalog events by magnitude, depth, and date."
+                activeFilterCount={activeFilterCount}
+              >
+                <form method="get">
+                  <input type="hidden" name="q" value={request.query} />
+                  <input type="hidden" name="limit" value={request.limit} />
+                  <input type="hidden" name="applied" value="1" />
+                  <input type="hidden" name="page" value="1" />
+                  <div class="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto p-4 text-sm">
+                    <fieldset class="space-y-2">
+                      <legend class="font-semibold">Magnitude</legend>
+                      <div class="grid grid-cols-2 gap-2">
+                        {MAGNITUDE_RANGE_OPTIONS.map((option) => (
+                          <label class="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              name="magnitude"
+                              value={option.value}
+                              checked={magnitudeValues.includes(option.value)}
+                            />
+                            <span class={`size-2.5 rounded-full ${option.colorClass}`} />
+                            {option.label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend class="mb-2 font-semibold">Depth (km)</legend>
+                      <div class="grid grid-cols-2 gap-2">
+                        <>
+                          <input
+                            class={fieldClass}
+                            type="number"
+                            min="0"
+                            max={depthTo ?? undefined}
+                            name="depth_from"
+                            value={depthFrom ?? ''}
+                            placeholder="From"
+                          />
+                          <input
+                            class={fieldClass}
+                            type="number"
+                            min={depthFrom ?? 0}
+                            name="depth_to"
+                            value={depthTo ?? ''}
+                            placeholder="To"
+                          />
+                        </>
+                      </div>
+                    </fieldset>
+                    <fieldset>
+                      <legend class="mb-2 font-semibold">Date range</legend>
+                      <div class="grid grid-cols-2 gap-2">
+                        <>
+                          <input
+                            class={fieldClass}
+                            type="date"
+                            name="date_from"
+                            value={dateFrom ?? ''}
+                            max={dateTo ?? undefined}
+                            aria-label="Date from"
+                          />
+                          <input
+                            class={fieldClass}
+                            type="date"
+                            name="date_to"
+                            value={dateTo ?? ''}
+                            min={dateFrom ?? undefined}
+                            aria-label="Date to"
+                          />
+                        </>
+                      </div>
+                    </fieldset>
+                  </div>
+                  <footer class="grid grid-cols-2 gap-2 border-t p-2">
+                    <a href={resetHref} class={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                      Reset filters
+                    </a>
+                    <button class={buttonVariants({ size: 'sm' })}>Apply filters</button>
+                  </footer>
+                </form>
+              </TableFilterMenu>
+            </TableToolbar>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-muted/60 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <>
+                      <th class="p-3">Magnitude</th>
+                      <th class="p-3">Location</th>
+                      <th class="p-3">Event time</th>
+                      <th class="p-3">Depth</th>
+                      <th class="p-3">Coordinates</th>
+                    </>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  {rows.length ? (
+                    rows.map((event) => (
+                      <tr>
+                        <td class="p-3 font-semibold text-primary">
+                          M{event.Magnitude.toFixed(1)}
+                        </td>
+                        <td class="p-3">
+                          <strong>{event.Location ?? 'Unknown location'}</strong>
+                          <span class="block text-xs text-muted-foreground">{event.id}</span>
+                        </td>
+                        <td class="p-3 whitespace-nowrap">
+                          {PHT.format(new Date(event.event_time ?? event['Date-Time']))} PHT
+                        </td>
+                        <td class="p-3">{event.Depth} km</td>
+                        <td class="p-3 tabular-nums">
+                          {event.Latitude.toFixed(3)}, {event.Longitude.toFixed(3)}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colspan="5" class="p-8 text-center text-muted-foreground">
+                        No events match the current search and filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <TablePagination url={Astro.url} total={total} page={page} pageSize={request.limit} />
+          </section>
+        )
+      }
+    </div>
+  </main>
 </Layout>

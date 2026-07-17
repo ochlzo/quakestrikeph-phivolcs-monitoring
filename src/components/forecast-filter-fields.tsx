@@ -1,16 +1,16 @@
-import { Input } from "@/components/ui/input"
-import type { ForecastFilters } from "@/lib/earthquake-map-filters"
+import { Input } from '@/components/ui/input';
+import type { ForecastFilters } from '@/lib/earthquake-map-filters';
 
-const LIKELIHOODS = ["low", "medium", "high"] as const
+const LIKELIHOODS = ['low', 'medium', 'high'] as const;
 
 type Props = {
-  value: ForecastFilters
-  onChange: (value: ForecastFilters) => void
-}
+  value: ForecastFilters;
+  onChange: (value: ForecastFilters) => void;
+};
 
 function toggle(values: string[], value: string, checked: boolean) {
-  if (!checked && values.length === 1 && values[0] === value) return values
-  return checked ? [...values, value] : values.filter((item) => item !== value)
+  if (!checked && values.length === 1 && values[0] === value) return values;
+  return checked ? [...values, value] : values.filter((item) => item !== value);
 }
 
 export function ForecastFilterFields({ value, onChange }: Props) {
@@ -25,10 +25,16 @@ export function ForecastFilterFields({ value, onChange }: Props) {
               <input
                 type="checkbox"
                 checked={value.aftershock24hLikelihoods.includes(likelihood)}
-                onChange={(event) => onChange({
-                  ...value,
-                  aftershock24hLikelihoods: toggle(value.aftershock24hLikelihoods, likelihood, event.target.checked),
-                })}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    aftershock24hLikelihoods: toggle(
+                      value.aftershock24hLikelihoods,
+                      likelihood,
+                      event.target.checked,
+                    ),
+                  })
+                }
               />
               {likelihood}
             </label>
@@ -41,10 +47,16 @@ export function ForecastFilterFields({ value, onChange }: Props) {
               <input
                 type="checkbox"
                 checked={value.m5PlusLikelihoods.includes(likelihood)}
-                onChange={(event) => onChange({
-                  ...value,
-                  m5PlusLikelihoods: toggle(value.m5PlusLikelihoods, likelihood, event.target.checked),
-                })}
+                onChange={(event) =>
+                  onChange({
+                    ...value,
+                    m5PlusLikelihoods: toggle(
+                      value.m5PlusLikelihoods,
+                      likelihood,
+                      event.target.checked,
+                    ),
+                  })
+                }
               />
               {likelihood}
             </label>
@@ -58,11 +70,15 @@ export function ForecastFilterFields({ value, onChange }: Props) {
         step="0.1"
         aria-label="Minimum estimated strongest aftershock"
         placeholder="Minimum estimated strongest"
-        value={value.minimumEstimatedStrongestAftershock ?? ""}
-        onChange={(event) => onChange({
-          ...value,
-          minimumEstimatedStrongestAftershock: event.target.value ? Number(event.target.value) : null,
-        })}
+        value={value.minimumEstimatedStrongestAftershock ?? ''}
+        onChange={(event) =>
+          onChange({
+            ...value,
+            minimumEstimatedStrongestAftershock: event.target.value
+              ? Number(event.target.value)
+              : null,
+          })
+        }
       />
       <label className="flex items-center gap-2">
         <input
@@ -73,5 +89,5 @@ export function ForecastFilterFields({ value, onChange }: Props) {
         Include events without forecasts
       </label>
     </fieldset>
-  )
+  );
 }

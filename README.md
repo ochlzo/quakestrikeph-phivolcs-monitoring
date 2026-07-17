@@ -25,17 +25,17 @@ No VPS is required for initial testing. The Compose stack and tunnel can run fro
 
 Copy `.env.example` to `.env` and replace every placeholder. `.env` is ignored by Git.
 
-| Variable | Required | Purpose |
-| --- | --- | --- |
-| `PORTAL_ORIGIN` | Yes | Exact browser origin used for mutation-origin checks, such as `https://monitor.example.com` or `http://localhost:4322` for `pnpm dev`. |
-| `CLOUDFLARED_TOKEN` | Compose | Secret token for the remotely managed Cloudflare Tunnel connector. |
-| `CF_ACCESS_AUD` | Production | Audience tag from the self-hosted Cloudflare Access application. This is not the tunnel token. |
-| `CF_ACCESS_TEAM_DOMAIN` | Production | Exact team origin, such as `https://your-team.cloudflareaccess.com`. |
-| `ASTRO_PORT` | No | Internal app port; defaults to `4321`. Do not publish it on the host. |
-| `SUPABASE_URL` | Yes | Supabase project URL used by server-side code. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server secret (`sb_secret_...` or legacy service-role key). An `sb_publishable_...` key will be rejected. |
-| `GOOGLE_MAPS_API_KEY` | No | Server-only Google tile key. The map falls back to OpenStreetMap when omitted or unavailable. |
-| `DEV_AUTH_EMAIL` | Local dev only | Development identity for `pnpm dev`. Production Compose ignores it. |
+| Variable                    | Required       | Purpose                                                                                                                                |
+| --------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `PORTAL_ORIGIN`             | Yes            | Exact browser origin used for mutation-origin checks, such as `https://monitor.example.com` or `http://localhost:4322` for `pnpm dev`. |
+| `CLOUDFLARED_TOKEN`         | Compose        | Secret token for the remotely managed Cloudflare Tunnel connector.                                                                     |
+| `CF_ACCESS_AUD`             | Production     | Audience tag from the self-hosted Cloudflare Access application. This is not the tunnel token.                                         |
+| `CF_ACCESS_TEAM_DOMAIN`     | Production     | Exact team origin, such as `https://your-team.cloudflareaccess.com`.                                                                   |
+| `ASTRO_PORT`                | No             | Internal app port; defaults to `4321`. Do not publish it on the host.                                                                  |
+| `SUPABASE_URL`              | Yes            | Supabase project URL used by server-side code.                                                                                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes            | Server secret (`sb_secret_...` or legacy service-role key). An `sb_publishable_...` key will be rejected.                              |
+| `GOOGLE_MAPS_API_KEY`       | No             | Server-only Google tile key. The map falls back to OpenStreetMap when omitted or unavailable.                                          |
+| `DEV_AUTH_EMAIL`            | Local dev only | Development identity for `pnpm dev`. Production Compose ignores it.                                                                    |
 
 Never commit `.env`, log the tunnel token or Supabase secret, or expose the Supabase secret through a public Astro environment variable.
 
@@ -211,14 +211,14 @@ The existing tunnel token, hostname, and `http://app:4321` route can be reused. 
 
 ## Troubleshooting
 
-| Symptom | Likely cause |
-| --- | --- |
-| `401 Unauthorized` | Missing/invalid Access JWT, incorrect `CF_ACCESS_AUD`, or incorrect `CF_ACCESS_TEAM_DOMAIN`. |
-| `403 Forbidden` while saving | Browser origin does not exactly match `PORTAL_ORIGIN`. |
-| `Forecast queue unavailable` | Missing Supabase variables, wrong server key, missing migration, or unavailable source tables. |
-| Service-role key rejected | An `sb_publishable_...` key was supplied instead of an `sb_secret_...` or legacy service-role key. |
-| OTP email does not arrive | Email is not explicitly allowed, message is in spam, or an email scanner consumed the single-use PIN. |
-| Tunnel is unhealthy | Invalid tunnel token, connector stopped, Docker networking issue, or outbound port `7844` blocked. |
+| Symptom                      | Likely cause                                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `401 Unauthorized`           | Missing/invalid Access JWT, incorrect `CF_ACCESS_AUD`, or incorrect `CF_ACCESS_TEAM_DOMAIN`.          |
+| `403 Forbidden` while saving | Browser origin does not exactly match `PORTAL_ORIGIN`.                                                |
+| `Forecast queue unavailable` | Missing Supabase variables, wrong server key, missing migration, or unavailable source tables.        |
+| Service-role key rejected    | An `sb_publishable_...` key was supplied instead of an `sb_secret_...` or legacy service-role key.    |
+| OTP email does not arrive    | Email is not explicitly allowed, message is in spam, or an email scanner consumed the single-use PIN. |
+| Tunnel is unhealthy          | Invalid tunnel token, connector stopped, Docker networking issue, or outbound port `7844` blocked.    |
 
 ## Maintenance
 

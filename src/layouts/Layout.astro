@@ -4,33 +4,46 @@ import { PortalShell } from '../components/portal-shell';
 import { getOperatorProfile } from '../lib/portal-data';
 
 interface Props {
-	title?: string;
-	shell?: boolean;
+  title?: string;
+  shell?: boolean;
 }
 
 const { title = 'Forecast monitor', shell = true } = Astro.props;
 const operatorEmail = Astro.locals.user?.email;
 let operatorDisplayName = '';
 if (shell && operatorEmail) {
-	try { operatorDisplayName = (await getOperatorProfile(operatorEmail))?.display_name ?? ''; } catch { operatorDisplayName = ''; }
+  try {
+    operatorDisplayName = (await getOperatorProfile(operatorEmail))?.display_name ?? '';
+  } catch {
+    operatorDisplayName = '';
+  }
 }
 ---
 
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="generator" content={Astro.generator} />
-		<meta name="robots" content="noindex, nofollow" />
-		<title>{title} · QuakeStrike PH</title>
-	</head>
-	<body>
-		{shell ? (
-			<PortalShell client:load activePath={Astro.url.pathname} operatorEmail={operatorEmail ?? ''} operatorDisplayName={operatorDisplayName}>
-				<slot />
-			</PortalShell>
-		) : <slot />}
-	</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>{title} · QuakeStrike PH</title>
+  </head>
+  <body>
+    {
+      shell ? (
+        <PortalShell
+          client:load
+          activePath={Astro.url.pathname}
+          operatorEmail={operatorEmail ?? ''}
+          operatorDisplayName={operatorDisplayName}
+        >
+          <slot />
+        </PortalShell>
+      ) : (
+        <slot />
+      )
+    }
+  </body>
 </html>

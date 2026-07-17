@@ -7,11 +7,120 @@ import { parseReviewInput } from '@/lib/reviews';
 const eventId = Astro.params.eventId;
 if (!eventId) return Astro.redirect('/forecasts');
 let actionError = '';
-if (Astro.request.method === 'POST') { try { const form = await Astro.request.formData(); const revision = form.get('forecast_created_at'); if (typeof revision !== 'string' || !revision) throw new Error('Forecast revision is missing.'); await saveForecastReview(eventId, revision, Astro.locals.user.email, parseReviewInput(form), Astro.url.pathname); return Astro.redirect(`/reviews/${encodeURIComponent(eventId)}?saved=1`, 303); } catch (reason) { actionError = reason instanceof Error ? reason.message : 'Could not save review.'; } }
-let item = null; let error = '';
-try { item = await getForecastCase(eventId); } catch (reason) { error = reason instanceof Error ? reason.message : 'Could not load forecast.'; }
+if (Astro.request.method === 'POST') {
+  try {
+    const form = await Astro.request.formData();
+    const revision = form.get('forecast_created_at');
+    if (typeof revision !== 'string' || !revision) throw new Error('Forecast revision is missing.');
+    await saveForecastReview(
+      eventId,
+      revision,
+      Astro.locals.user.email,
+      parseReviewInput(form),
+      Astro.url.pathname,
+    );
+    return Astro.redirect(`/reviews/${encodeURIComponent(eventId)}?saved=1`, 303);
+  } catch (reason) {
+    actionError = reason instanceof Error ? reason.message : 'Could not save review.';
+  }
+}
+let item = null;
+let error = '';
+try {
+  item = await getForecastCase(eventId);
+} catch (reason) {
+  error = reason instanceof Error ? reason.message : 'Could not load forecast.';
+}
 if (!item && !error) Astro.response.status = 404;
-const pct = (value: number | null) => value === null ? 'Unavailable' : `${(value * 100).toFixed(1)}%`;
+const pct = (value: number | null) =>
+  value === null ? 'Unavailable' : `${(value * 100).toFixed(1)}%`;
 const forecastUrl = `https://quakestrikeph.qzz.io/forecast?event=${encodeURIComponent(eventId)}`;
 ---
-<Layout title="Forecast review"><main class="flex-1 p-4 sm:p-6"><div class="mx-auto max-w-7xl space-y-5"><a href="/forecasts" class={buttonVariants({ variant: 'ghost' })}>← Back to forecast list</a>{error || !item ? <div class="rounded-xl border bg-card p-6"><h1 class="font-semibold">Forecast unavailable</h1><p class="mt-2 text-sm text-muted-foreground">{error || 'No current forecast exists for this event.'}</p></div> : <><header><p class="text-xs font-semibold uppercase tracking-wide text-primary">Forecast review</p><h1 class="text-2xl font-semibold">M{item.event.Magnitude.toFixed(1)} · {item.event.Location ?? 'Unknown location'}</h1></header>{Astro.url.searchParams.has('saved') ? <div role="status" class="rounded-lg border bg-emerald-50 p-3 text-emerald-800">Review saved.</div> : null}{actionError ? <div role="alert" class="rounded-lg border bg-red-50 p-3 text-destructive">{actionError}</div> : null}<div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,.65fr)]"><section class="space-y-5"><div class="grid gap-3 sm:grid-cols-3"><div class="rounded-xl border bg-primary p-5 text-primary-foreground"><span class="text-xs">Aftershock within 24h</span><strong class="mt-2 block text-3xl">{pct(item.forecast.aftershock_24h)}</strong></div><div class="rounded-xl border bg-card p-5"><span class="text-xs text-muted-foreground">M5+ within 24h</span><strong class="mt-2 block text-3xl">{pct(item.forecast.m5_plus_aftershock)}</strong></div><div class="rounded-xl border bg-card p-5"><span class="text-xs text-muted-foreground">Estimated strongest</span><strong class="mt-2 block text-3xl">{item.forecast.est_max_aftershock === null ? '—' : `M${item.forecast.est_max_aftershock.toFixed(1)}`}</strong></div></div><iframe title="Forecast discussion" src={forecastUrl} class="h-[65svh] w-full rounded-xl border bg-card"></iframe></section><section class="h-[75svh] overflow-hidden rounded-xl border bg-card shadow-sm"><ReviewForm client:load item={item} /></section></div></>}</div></main></Layout>
+
+<Layout title="Forecast review"
+  ><main class="flex-1 p-4 sm:p-6">
+    <div class="mx-auto max-w-7xl space-y-5">
+      <a href="/forecasts" class={buttonVariants({ variant: 'ghost' })}>← Back to forecast list</a>{
+        error || !item ? (
+          <div class="rounded-xl border bg-card p-6">
+            <>
+              <h1 class="font-semibold">Forecast unavailable</h1>
+              <p class="mt-2 text-sm text-muted-foreground">
+                {error || 'No current forecast exists for this event.'}
+              </p>
+            </>
+          </div>
+        ) : (
+          <>
+            <header>
+              <>
+                <p class="text-xs font-semibold uppercase tracking-wide text-primary">
+                  Forecast review
+                </p>
+                <h1 class="text-2xl font-semibold">
+                  M{item.event.Magnitude.toFixed(1)} · {item.event.Location ?? 'Unknown location'}
+                </h1>
+              </>
+            </header>
+            {Astro.url.searchParams.has('saved') ? (
+              <div role="status" class="rounded-lg border bg-emerald-50 p-3 text-emerald-800">
+                Review saved.
+              </div>
+            ) : null}
+            {actionError ? (
+              <div role="alert" class="rounded-lg border bg-red-50 p-3 text-destructive">
+                {actionError}
+              </div>
+            ) : null}
+            <div class="grid items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,.65fr)]">
+              <>
+                <section class="space-y-5">
+                  <>
+                    <div class="grid gap-3 sm:grid-cols-3">
+                      <>
+                        <div class="rounded-xl border bg-primary p-5 text-primary-foreground">
+                          <>
+                            <span class="text-xs">Aftershock within 24h</span>
+                            <strong class="mt-2 block text-3xl">
+                              {pct(item.forecast.aftershock_24h)}
+                            </strong>
+                          </>
+                        </div>
+                        <div class="rounded-xl border bg-card p-5">
+                          <>
+                            <span class="text-xs text-muted-foreground">M5+ within 24h</span>
+                            <strong class="mt-2 block text-3xl">
+                              {pct(item.forecast.m5_plus_aftershock)}
+                            </strong>
+                          </>
+                        </div>
+                        <div class="rounded-xl border bg-card p-5">
+                          <>
+                            <span class="text-xs text-muted-foreground">Estimated strongest</span>
+                            <strong class="mt-2 block text-3xl">
+                              {item.forecast.est_max_aftershock === null
+                                ? '—'
+                                : `M${item.forecast.est_max_aftershock.toFixed(1)}`}
+                            </strong>
+                          </>
+                        </div>
+                      </>
+                    </div>
+                    <iframe
+                      title="Forecast discussion"
+                      src={forecastUrl}
+                      class="h-[65svh] w-full rounded-xl border bg-card"
+                    />
+                  </>
+                </section>
+                <section class="h-[75svh] overflow-hidden rounded-xl border bg-card shadow-sm">
+                  <ReviewForm client:load item={item} />
+                </section>
+              </>
+            </div>
+          </>
+        )
+      }
+    </div>
+  </main></Layout
+>

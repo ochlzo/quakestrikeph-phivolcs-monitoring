@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   BellIcon,
@@ -7,13 +7,10 @@ import {
   MapIcon,
   ScrollTextIcon,
   TerminalIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
-import {
-  EventSidebarPanel,
-  type EventSidebarPanelProps,
-} from "@/components/event-sidebar-panel";
-import { NavUser } from "@/components/nav-user";
+import { EventSidebarPanel, type EventSidebarPanelProps } from '@/components/event-sidebar-panel';
+import { NavUser } from '@/components/nav-user';
 import {
   Sidebar,
   SidebarContent,
@@ -24,29 +21,23 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar";
+} from '@/components/ui/sidebar';
 
 const NAV = [
-  { href: "/", label: "Monitor", icon: MapIcon },
-  { href: "/forecasts", label: "Forecasts", icon: ClipboardListIcon },
-  { href: "/events", label: "Raw events", icon: DatabaseIcon },
-  { href: "/logs", label: "Logs", icon: ScrollTextIcon },
-  { href: "", label: "Alerts — coming soon", icon: BellIcon, disabled: true },
+  { href: '/', label: 'Monitor', icon: MapIcon },
+  { href: '/forecasts', label: 'Forecasts', icon: ClipboardListIcon },
+  { href: '/events', label: 'Raw events', icon: DatabaseIcon },
+  { href: '/logs', label: 'Logs', icon: ScrollTextIcon },
+  { href: '', label: 'Alerts — coming soon', icon: BellIcon, disabled: true },
 ] as const;
 
 type AppSidebarProps = {
   activePath: string;
-  operator: EventSidebarPanelProps["operator"];
-  eventPanel?: Omit<EventSidebarPanelProps, "operator" | "mobileNavigation">;
+  operator: EventSidebarPanelProps['operator'];
+  eventPanel?: Omit<EventSidebarPanelProps, 'operator' | 'mobileNavigation'>;
 };
 
-function AppNavigation({
-  activePath,
-  compact = false,
-}: {
-  activePath: string;
-  compact?: boolean;
-}) {
+function AppNavigation({ activePath, compact = false }: { activePath: string; compact?: boolean }) {
   return (
     <SidebarMenu>
       {NAV.map(({ href, label, icon: Icon, ...item }) => (
@@ -54,19 +45,16 @@ function AppNavigation({
           <SidebarMenuButton
             tooltip={{ children: label, hidden: false }}
             isActive={href === activePath}
-            disabled={"disabled" in item}
+            disabled={'disabled' in item}
             render={
               href ? (
-                <a
-                  href={href}
-                  aria-current={href === activePath ? "page" : undefined}
-                />
+                <a href={href} aria-current={href === activePath ? 'page' : undefined} />
               ) : undefined
             }
-            className={compact ? "px-2.5 md:px-2" : undefined}
+            className={compact ? 'px-2.5 md:px-2' : undefined}
           >
             <Icon />
-            <span className={compact ? "sr-only" : undefined}>{label}</span>
+            <span className={compact ? 'sr-only' : undefined}>{label}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
@@ -74,11 +62,7 @@ function AppNavigation({
   );
 }
 
-export function AppSidebar({
-  activePath,
-  operator,
-  eventPanel,
-}: AppSidebarProps) {
+export function AppSidebar({ activePath, operator, eventPanel }: AppSidebarProps) {
   const mobileNavigation = (
     <nav aria-label="Portal navigation">
       <ul className="grid grid-cols-3 gap-1">
@@ -87,7 +71,7 @@ export function AppSidebar({
             {href ? (
               <a
                 href={href}
-                aria-current={href === activePath ? "page" : undefined}
+                aria-current={href === activePath ? 'page' : undefined}
                 className="flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-2 py-1.5 text-center text-[11px] hover:bg-sidebar-accent aria-current:bg-sidebar-accent"
               >
                 <Icon className="size-4" />
@@ -114,19 +98,13 @@ export function AppSidebar({
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                tooltip="QuakeStrike PH"
-                render={<a href="/" />}
-              >
+              <SidebarMenuButton size="lg" tooltip="QuakeStrike PH" render={<a href="/" />}>
                 <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                   <TerminalIcon />
                 </span>
                 <span className="grid flex-1 text-left text-sm leading-tight">
                   <strong>QuakeStrike PH</strong>
-                  <span className="text-xs text-muted-foreground">
-                    PHIVOLCS Monitoring
-                  </span>
+                  <span className="text-xs text-muted-foreground">PHIVOLCS Monitoring</span>
                 </span>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -147,10 +125,7 @@ export function AppSidebar({
   }
 
   return (
-    <Sidebar
-      collapsible="icon"
-      className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
-    >
+    <Sidebar collapsible="icon" className="overflow-hidden *:data-[sidebar=sidebar]:flex-row">
       <Sidebar
         collapsible="none"
         className="hidden w-[calc(var(--sidebar-width-icon)+1px)]! border-r md:flex"
@@ -183,11 +158,7 @@ export function AppSidebar({
           <NavUser user={operator} />
         </SidebarFooter>
       </Sidebar>
-      <EventSidebarPanel
-        {...eventPanel}
-        operator={operator}
-        mobileNavigation={mobileNavigation}
-      />
+      <EventSidebarPanel {...eventPanel} operator={operator} mobileNavigation={mobileNavigation} />
     </Sidebar>
   );
 }

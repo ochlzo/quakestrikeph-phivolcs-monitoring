@@ -1,14 +1,14 @@
-"use client"
+'use client';
 
-import type { ReactNode } from "react"
-import { FunnelIcon } from "lucide-react"
+import type { ReactNode } from 'react';
+import { FunnelIcon } from 'lucide-react';
 
-import { Button } from "@/components/ui/button"
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/components/ui/dropdown-menu';
 
 export function TableFilterMenu({
   title,
@@ -16,10 +16,10 @@ export function TableFilterMenu({
   activeFilterCount,
   children,
 }: {
-  title: string
-  description: string
-  activeFilterCount: number
-  children: ReactNode
+  title: string;
+  description: string;
+  activeFilterCount: number;
+  children: ReactNode;
 }) {
   return (
     <DropdownMenu>
@@ -44,5 +44,5 @@ export function TableFilterMenu({
         {children}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

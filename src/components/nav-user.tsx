@@ -1,8 +1,8 @@
-import * as React from "react"
-import { ChevronsUpDownIcon, UserRoundIcon } from "lucide-react"
+import * as React from 'react';
+import { ChevronsUpDownIcon, UserRoundIcon } from 'lucide-react';
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,40 +10,40 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from '@/components/ui/sidebar';
 
 export function NavUser({ user }: { user: { name: string; email: string } }) {
-  const { isMobile } = useSidebar()
-  const [name, setName] = React.useState(user.name)
-  const [draft, setDraft] = React.useState(user.name)
-  const [status, setStatus] = React.useState("")
-  const [saving, setSaving] = React.useState(false)
+  const { isMobile } = useSidebar();
+  const [name, setName] = React.useState(user.name);
+  const [draft, setDraft] = React.useState(user.name);
+  const [status, setStatus] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSaving(true)
-    setStatus("")
-    const response = await fetch("/api/operator-profile", {
-      method: "POST",
+    event.preventDefault();
+    setSaving(true);
+    setStatus('');
+    const response = await fetch('/api/operator-profile', {
+      method: 'POST',
       body: new FormData(event.currentTarget),
-    })
-    const data = (await response.json()) as { display_name?: string; error?: string }
+    });
+    const data = (await response.json()) as { display_name?: string; error?: string };
     if (response.ok && data.display_name) {
-      setName(data.display_name)
-      setDraft(data.display_name)
-      setStatus("Profile saved.")
+      setName(data.display_name);
+      setDraft(data.display_name);
+      setStatus('Profile saved.');
     } else {
-      setStatus(data.error ?? "Could not save profile.")
+      setStatus(data.error ?? 'Could not save profile.');
     }
-    setSaving(false)
+    setSaving(false);
   }
 
   return (
@@ -62,17 +62,19 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
             }
           >
             <Avatar className="size-8 rounded-lg">
-              <AvatarFallback className="rounded-lg"><UserRoundIcon /></AvatarFallback>
+              <AvatarFallback className="rounded-lg">
+                <UserRoundIcon />
+              </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{name || "Operator"}</span>
+              <span className="truncate font-medium">{name || 'Operator'}</span>
               <span className="truncate text-xs">{user.email}</span>
             </div>
             <ChevronsUpDownIcon className="ml-auto size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             className="w-[min(22rem,calc(100vw-2rem))] rounded-lg p-3"
-            side={isMobile ? "bottom" : "right"}
+            side={isMobile ? 'bottom' : 'right'}
             align="end"
             sideOffset={8}
           >
@@ -99,13 +101,19 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
                     onKeyDown={(event) => event.stopPropagation()}
                   />
                 </div>
-                {status ? <p role="status" className="text-xs text-muted-foreground">{status}</p> : null}
-                <Button className="w-full" disabled={saving}>{saving ? "Saving…" : "Save profile"}</Button>
+                {status ? (
+                  <p role="status" className="text-xs text-muted-foreground">
+                    {status}
+                  </p>
+                ) : null}
+                <Button className="w-full" disabled={saving}>
+                  {saving ? 'Saving…' : 'Save profile'}
+                </Button>
               </form>
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

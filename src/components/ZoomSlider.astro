@@ -14,26 +14,12 @@ interface Props {
   id?: string;
 }
 
-const {
-  positionStyles = "bottom: 24px; right: 24px;",
-  id = "map-zoom-slider",
-} = Astro.props;
+const { positionStyles = 'bottom: 24px; right: 24px;', id = 'map-zoom-slider' } = Astro.props;
 ---
 
-<div
-  class="zoom-slider-container"
-  style={positionStyles}
->
+<div class="zoom-slider-container" style={positionStyles}>
   <button class="zoom-btn zoom-out" aria-label="Zoom out">−</button>
-  <input
-    type="range"
-    id={id}
-    class="zoom-slider"
-    min="5"
-    max="20"
-    step="0.1"
-    value="6"
-  />
+  <input type="range" id={id} class="zoom-slider" min="5" max="20" step="0.1" value="6" />
   <button class="zoom-btn zoom-in" aria-label="Zoom in">+</button>
 </div>
 
@@ -150,18 +136,18 @@ const {
 </style>
 
 <script>
-  import L from "leaflet";
+  import L from 'leaflet';
 
-  document.addEventListener("leaflet:ready", (e) => {
+  document.addEventListener('leaflet:ready', (e) => {
     const { map } = (e as CustomEvent<{ map: L.Map }>).detail;
 
     // Find the slider containers on the page
-    const containers = document.querySelectorAll(".zoom-slider-container");
-    
+    const containers = document.querySelectorAll('.zoom-slider-container');
+
     containers.forEach((container) => {
-      const slider = container.querySelector(".zoom-slider") as HTMLInputElement;
-      const btnOut = container.querySelector(".zoom-out") as HTMLButtonElement;
-      const btnIn = container.querySelector(".zoom-in") as HTMLButtonElement;
+      const slider = container.querySelector('.zoom-slider') as HTMLInputElement;
+      const btnOut = container.querySelector('.zoom-out') as HTMLButtonElement;
+      const btnIn = container.querySelector('.zoom-in') as HTMLButtonElement;
 
       if (!slider) return;
 
@@ -171,25 +157,25 @@ const {
       slider.value = map.getZoom().toString();
 
       // Listen for map zoom changes (slider updates to match map)
-      map.on("zoom", () => {
+      map.on('zoom', () => {
         slider.value = map.getZoom().toFixed(1);
       });
 
       // Listen for slider input (map updates to match slider)
-      slider.addEventListener("input", (event) => {
+      slider.addEventListener('input', (event) => {
         const val = parseFloat((event.target as HTMLInputElement).value);
         map.setZoom(val);
       });
 
       // Plus / Minus button click actions
       if (btnOut) {
-        btnOut.addEventListener("click", () => {
+        btnOut.addEventListener('click', () => {
           map.zoomOut();
         });
       }
 
       if (btnIn) {
-        btnIn.addEventListener("click", () => {
+        btnIn.addEventListener('click', () => {
           map.zoomIn();
         });
       }

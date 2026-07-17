@@ -9,10 +9,19 @@ import { dateParam, parseTableRequest } from '@/lib/table-query';
 
 const request = parseTableRequest(Astro.url);
 const params = Astro.url.searchParams;
-const selectedActions = [...new Set(params.getAll('action').map((value) => value.trim().slice(0, 100)).filter(Boolean))];
+const selectedActions = [
+  ...new Set(
+    params
+      .getAll('action')
+      .map((value) => value.trim().slice(0, 100))
+      .filter(Boolean),
+  ),
+];
 const dateFrom = dateParam(params, 'date_from');
 const dateTo = dateParam(params, 'date_to');
-const activeFilterCount = [selectedActions.length > 0, dateFrom !== null || dateTo !== null].filter(Boolean).length;
+const activeFilterCount = [selectedActions.length > 0, dateFrom !== null || dateTo !== null].filter(
+  Boolean,
+).length;
 let page = request.page;
 let rows: AuditLogRow[] = [];
 let total = 0;
@@ -20,84 +29,172 @@ let availableActions: string[] = [];
 let error = '';
 
 async function load(offset: number) {
-	return getAuditLogPage({
-		query: request.query,
-		actions: selectedActions,
-		dateFrom,
-		dateTo,
-		limit: request.limit,
-		offset,
-	});
+  return getAuditLogPage({
+    query: request.query,
+    actions: selectedActions,
+    dateFrom,
+    dateTo,
+    limit: request.limit,
+    offset,
+  });
 }
 try {
-	let result = await load(request.offset);
-	({ rows, total, actions: availableActions } = result);
-	const lastPage = Math.max(1, Math.ceil(total / request.limit));
-	if (page > lastPage) {
-		page = lastPage;
-		result = await load((page - 1) * request.limit);
-		({ rows, total, actions: availableActions } = result);
-	}
+  let result = await load(request.offset);
+  ({ rows, total, actions: availableActions } = result);
+  const lastPage = Math.max(1, Math.ceil(total / request.limit));
+  if (page > lastPage) {
+    page = lastPage;
+    result = await load((page - 1) * request.limit);
+    ({ rows, total, actions: availableActions } = result);
+  }
 } catch (reason) {
-	error = reason instanceof Error ? reason.message : 'Could not load audit logs.';
+  error = reason instanceof Error ? reason.message : 'Could not load audit logs.';
 }
 
 const actionOptions = [...new Set([...availableActions, ...selectedActions])].sort();
 const resetParams = new URLSearchParams({ limit: String(request.limit) });
 if (request.query) resetParams.set('q', request.query);
 const resetHref = `/logs?${resetParams}`;
-const PHT = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' });
-const fieldClass = 'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
-const actionLabel = (action: string) => action.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const PHT = new Intl.DateTimeFormat('en-PH', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Manila',
+});
+const fieldClass =
+  'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+const actionLabel = (action: string) =>
+  action.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 ---
 
 <Layout title="Audit logs">
-	<main class="flex-1 p-4 sm:p-6">
-		<div class="mx-auto max-w-7xl space-y-5">
-			<header>
-				<p class="text-xs font-semibold uppercase tracking-wide text-primary">Accountability</p>
-				<h1 class="text-2xl font-semibold">Operator logs</h1>
-				<p class="text-sm text-muted-foreground">Server-recorded review and profile mutations.</p>
-			</header>
-			{error ? (
-				<div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">{error}</div>
-			) : (
-				<section class="overflow-hidden rounded-xl border bg-card shadow-sm">
-					<TableToolbar url={Astro.url} query={request.query} placeholder="Search operator email, display name, or path" pageSize={request.limit}>
-						<TableFilterMenu client:load title="Filter operator logs" description="Narrow logs by action and Philippine date." activeFilterCount={activeFilterCount}>
-							<form method="get">
-								<input type="hidden" name="q" value={request.query} />
-								<input type="hidden" name="limit" value={request.limit} />
-								<input type="hidden" name="applied" value="1" />
-								<input type="hidden" name="page" value="1" />
-								<div class="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto p-4 text-sm">
-								<fieldset class="space-y-2">
-									<legend class="font-semibold">Action</legend>
-									{actionOptions.length ? actionOptions.map((action) => <label class="flex items-center gap-2"><input type="checkbox" name="action" value={action} checked={selectedActions.includes(action)} />{actionLabel(action)}</label>) : <p class="text-xs text-muted-foreground">No actions recorded yet.</p>}
-								</fieldset>
-								<fieldset>
-									<legend class="mb-2 font-semibold">Date range (PHT)</legend>
-									<div class="grid grid-cols-2 gap-2"><input class={fieldClass} type="date" name="date_from" value={dateFrom ?? ''} max={dateTo ?? undefined} aria-label="Date from" /><input class={fieldClass} type="date" name="date_to" value={dateTo ?? ''} min={dateFrom ?? undefined} aria-label="Date to" /></div>
-								</fieldset>
-								</div>
-								<footer class="grid grid-cols-2 gap-2 border-t p-2">
-									<a href={resetHref} class={buttonVariants({ variant: 'outline', size: 'sm' })}>Reset filters</a>
-									<button class={buttonVariants({ size: 'sm' })}>Apply filters</button>
-								</footer>
-							</form>
-						</TableFilterMenu>
-					</TableToolbar>
-					<div class="overflow-x-auto">
-								<table class="w-full text-left text-sm">
-									<thead class="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th class="p-3">Time</th><th class="p-3">Operator</th><th class="p-3">Action</th><th class="p-3">Route</th></tr></thead>
-									<tbody class="divide-y">
-										{rows.length ? rows.map((log) => <tr><td class="p-3 whitespace-nowrap">{PHT.format(new Date(log.created_at))} PHT</td><td class="p-3"><strong>{log.operator_display_name ?? log.user_email}</strong>{log.operator_display_name && <span class="block text-xs text-muted-foreground">{log.user_email}</span>}</td><td class="p-3 font-medium">{actionLabel(log.action)}</td><td class="p-3 font-mono text-xs">{log.path}</td></tr>) : <tr><td colspan="4" class="p-8 text-center text-muted-foreground">No logs match the current search and filters.</td></tr>}
-									</tbody>
-								</table>
-					</div>
-					<TablePagination url={Astro.url} total={total} page={page} pageSize={request.limit} />
-				</section>
-			)}
-		</div>
-	</main>
+  <main class="flex-1 p-4 sm:p-6">
+    <div class="mx-auto max-w-7xl space-y-5">
+      <header>
+        <p class="text-xs font-semibold uppercase tracking-wide text-primary">Accountability</p>
+        <h1 class="text-2xl font-semibold">Operator logs</h1>
+        <p class="text-sm text-muted-foreground">Server-recorded review and profile mutations.</p>
+      </header>
+      {
+        error ? (
+          <div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">
+            {error}
+          </div>
+        ) : (
+          <section class="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <TableToolbar
+              url={Astro.url}
+              query={request.query}
+              placeholder="Search operator email, display name, or path"
+              pageSize={request.limit}
+            >
+              <TableFilterMenu
+                client:load
+                title="Filter operator logs"
+                description="Narrow logs by action and Philippine date."
+                activeFilterCount={activeFilterCount}
+              >
+                <form method="get">
+                  <input type="hidden" name="q" value={request.query} />
+                  <input type="hidden" name="limit" value={request.limit} />
+                  <input type="hidden" name="applied" value="1" />
+                  <input type="hidden" name="page" value="1" />
+                  <div class="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto p-4 text-sm">
+                    <fieldset class="space-y-2">
+                      <legend class="font-semibold">Action</legend>
+                      {actionOptions.length ? (
+                        actionOptions.map((action) => (
+                          <label class="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              name="action"
+                              value={action}
+                              checked={selectedActions.includes(action)}
+                            />
+                            {actionLabel(action)}
+                          </label>
+                        ))
+                      ) : (
+                        <p class="text-xs text-muted-foreground">No actions recorded yet.</p>
+                      )}
+                    </fieldset>
+                    <fieldset>
+                      <legend class="mb-2 font-semibold">Date range (PHT)</legend>
+                      <div class="grid grid-cols-2 gap-2">
+                        <>
+                          <input
+                            class={fieldClass}
+                            type="date"
+                            name="date_from"
+                            value={dateFrom ?? ''}
+                            max={dateTo ?? undefined}
+                            aria-label="Date from"
+                          />
+                          <input
+                            class={fieldClass}
+                            type="date"
+                            name="date_to"
+                            value={dateTo ?? ''}
+                            min={dateFrom ?? undefined}
+                            aria-label="Date to"
+                          />
+                        </>
+                      </div>
+                    </fieldset>
+                  </div>
+                  <footer class="grid grid-cols-2 gap-2 border-t p-2">
+                    <a href={resetHref} class={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                      Reset filters
+                    </a>
+                    <button class={buttonVariants({ size: 'sm' })}>Apply filters</button>
+                  </footer>
+                </form>
+              </TableFilterMenu>
+            </TableToolbar>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead class="bg-muted/60 text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <>
+                      <th class="p-3">Time</th>
+                      <th class="p-3">Operator</th>
+                      <th class="p-3">Action</th>
+                      <th class="p-3">Route</th>
+                    </>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  {rows.length ? (
+                    rows.map((log) => (
+                      <tr>
+                        <td class="p-3 whitespace-nowrap">
+                          {PHT.format(new Date(log.created_at))} PHT
+                        </td>
+                        <td class="p-3">
+                          <strong>{log.operator_display_name ?? log.user_email}</strong>
+                          {log.operator_display_name && (
+                            <span class="block text-xs text-muted-foreground">
+                              {log.user_email}
+                            </span>
+                          )}
+                        </td>
+                        <td class="p-3 font-medium">{actionLabel(log.action)}</td>
+                        <td class="p-3 font-mono text-xs">{log.path}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colspan="4" class="p-8 text-center text-muted-foreground">
+                        No logs match the current search and filters.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <TablePagination url={Astro.url} total={total} page={page} pageSize={request.limit} />
+          </section>
+        )
+      }
+    </div>
+  </main>
 </Layout>

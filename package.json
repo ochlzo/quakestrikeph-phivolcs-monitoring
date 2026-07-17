@@ -13,7 +13,9 @@
     "check": "astro check",
     "test": "node --experimental-strip-types --test src/lib/cloudflare-access.test.ts src/lib/operator-profile.test.ts src/lib/reviews.test.ts src/lib/table-query.test.ts src/data/earthquakes.test.ts",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check"
   },
   "dependencies": {
     "@astrojs/node": "^11.0.2",
@@ -40,6 +42,8 @@
     "@types/node": "^26.1.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "prettier": "3.9.5",
+    "prettier-plugin-astro": "0.14.1",
     "typescript": "^6.0.3"
   }
 }

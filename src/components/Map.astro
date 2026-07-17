@@ -24,8 +24,8 @@ const {
   lat = 12.3937,
   lng = 123.0908,
   zoom = 7,
-  height = "500px",
-  id = "leaflet-map",
+  height = '500px',
+  id = 'leaflet-map',
 } = Astro.props;
 ---
 
@@ -37,12 +37,13 @@ const {
   style={`position: relative; height: ${height}; width: 100%; overflow: hidden;`}
   aria-label="Interactive map of the Philippines"
   role="application"
-></div>
+>
+</div>
 
 <script>
-  import L from "leaflet";
-  import { getRecentEarthquakeMarkerPage, type EarthquakeMarker } from "../data/earthquakes";
-  import { addMapBasemap } from "../lib/map-basemap";
+  import L from 'leaflet';
+  import { getRecentEarthquakeMarkerPage, type EarthquakeMarker } from '../data/earthquakes';
+  import { addMapBasemap } from '../lib/map-basemap';
   import {
     FILTERS_COMPLETE_EVENT,
     EARTHQUAKE_EVENTS_REQUEST_EVENT,
@@ -57,33 +58,30 @@ const {
     countActiveMapFilters,
     magnitudeMarkerBand,
     type EarthquakeMapFilters,
-  } from "../lib/earthquake-map-filters";
+  } from '../lib/earthquake-map-filters';
 
-  function addEventDetail(
-    list: HTMLDListElement,
-    label: string,
-    value: string,
-  ) {
-    const term = document.createElement("dt");
-    term.className = "text-muted-foreground";
+  function addEventDetail(list: HTMLDListElement, label: string, value: string) {
+    const term = document.createElement('dt');
+    term.className = 'text-muted-foreground';
     term.textContent = label;
-    const detail = document.createElement("dd");
-    detail.className = "text-left font-medium";
+    const detail = document.createElement('dd');
+    detail.className = 'text-left font-medium';
     detail.textContent = value;
     list.append(term, detail);
   }
 
   function createCloudAlertIcon() {
-    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    icon.classList.add("size-4", "shrink-0");
-    icon.setAttribute("viewBox", "0 0 24 24");
-    icon.setAttribute("fill", "none");
-    icon.setAttribute("stroke", "currentColor");
-    icon.setAttribute("stroke-width", "2");
-    icon.setAttribute("stroke-linecap", "round");
-    icon.setAttribute("stroke-linejoin", "round");
-    icon.setAttribute("aria-hidden", "true");
-    icon.innerHTML = '<path d="M12 12v4"/><path d="M12 20h.01"/><path d="M8.128 16.949A7 7 0 1 1 15.71 8h1.79a1 1 0 0 1 0 9h-1.642"/>';
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.classList.add('size-4', 'shrink-0');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('stroke-linecap', 'round');
+    icon.setAttribute('stroke-linejoin', 'round');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.innerHTML =
+      '<path d="M12 12v4"/><path d="M12 20h.01"/><path d="M8.128 16.949A7 7 0 1 1 15.71 8h1.79a1 1 0 0 1 0 9h-1.642"/>';
     return icon;
   }
 
@@ -95,38 +93,39 @@ const {
     layer.clearLayers();
     markerByEventId.clear();
     events.forEach((event) => {
-      const popup = document.createElement("div");
-      popup.className = "min-w-60 space-y-3 text-sm";
+      const popup = document.createElement('div');
+      popup.className = 'min-w-60 space-y-3 text-sm';
 
-      const location = document.createElement("h2");
-      location.className = "text-center text-base font-semibold";
-      location.textContent = event.location ?? "Unknown location";
+      const location = document.createElement('h2');
+      location.className = 'text-center text-base font-semibold';
+      location.textContent = event.location ?? 'Unknown location';
 
-      const details = document.createElement("dl");
-      details.className = "grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5";
-      addEventDetail(details, "Date", event.date);
-      addEventDetail(details, "Latitude", `${event.latitude.toFixed(2)}°`);
-      addEventDetail(details, "Longitude", `${event.longitude.toFixed(2)}°`);
-      addEventDetail(details, "Magnitude", event.magnitude.toFixed(1));
-      addEventDetail(details, "Depth", `${event.depth} km`);
+      const details = document.createElement('dl');
+      details.className = 'grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5';
+      addEventDetail(details, 'Date', event.date);
+      addEventDetail(details, 'Latitude', `${event.latitude.toFixed(2)}°`);
+      addEventDetail(details, 'Longitude', `${event.longitude.toFixed(2)}°`);
+      addEventDetail(details, 'Magnitude', event.magnitude.toFixed(1));
+      addEventDetail(details, 'Depth', `${event.depth} km`);
 
       popup.append(location, details);
       if (!event.hasForecast) {
-        const forecastStatus = document.createElement("div");
-        forecastStatus.className = "flex items-center justify-center gap-1.5 text-muted-foreground";
-        const whyLink = document.createElement("a");
-        whyLink.href = "#";
-        whyLink.className = "underline underline-offset-4";
-        whyLink.textContent = "see why";
-        whyLink.addEventListener("click", (clickEvent) => clickEvent.preventDefault());
-        forecastStatus.append(createCloudAlertIcon(), "No forecast available ", whyLink);
+        const forecastStatus = document.createElement('div');
+        forecastStatus.className = 'flex items-center justify-center gap-1.5 text-muted-foreground';
+        const whyLink = document.createElement('a');
+        whyLink.href = '#';
+        whyLink.className = 'underline underline-offset-4';
+        whyLink.textContent = 'see why';
+        whyLink.addEventListener('click', (clickEvent) => clickEvent.preventDefault());
+        forecastStatus.append(createCloudAlertIcon(), 'No forecast available ', whyLink);
         popup.append(forecastStatus);
       } else {
-        const discussionLink = document.createElement("a");
-        discussionLink.href = "#";
-        discussionLink.className = "block text-center font-medium text-primary underline underline-offset-4";
-        discussionLink.textContent = "View forecast discussion →";
-        discussionLink.addEventListener("click", (clickEvent) => {
+        const discussionLink = document.createElement('a');
+        discussionLink.href = '#';
+        discussionLink.className =
+          'block text-center font-medium text-primary underline underline-offset-4';
+        discussionLink.textContent = 'View forecast discussion →';
+        discussionLink.addEventListener('click', (clickEvent) => {
           clickEvent.preventDefault();
           document.dispatchEvent(new CustomEvent(FORECAST_REVIEW_EVENT, { detail: event }));
         });
@@ -139,7 +138,7 @@ const {
       })
         .addTo(layer)
         .bindPopup(popup, { minWidth: 260 });
-      marker.on("click", () => {
+      marker.on('click', () => {
         document.dispatchEvent(new CustomEvent(EARTHQUAKE_SELECTED_EVENT, { detail: event }));
       });
       markerByEventId.set(event.id, marker);
@@ -158,9 +157,11 @@ const {
     let loadingMore = false;
 
     function publishEvents() {
-      document.dispatchEvent(new CustomEvent(EARTHQUAKE_EVENTS_UPDATED_EVENT, {
-        detail: { events, hasMore, atLimit, loadingMore },
-      }));
+      document.dispatchEvent(
+        new CustomEvent(EARTHQUAKE_EVENTS_UPDATED_EVENT, {
+          detail: { events, hasMore, atLimit, loadingMore },
+        }),
+      );
     }
 
     async function reload(filters?: EarthquakeMapFilters) {
@@ -177,10 +178,12 @@ const {
           atLimit = page.atLimit;
           renderEarthquakes(layer, events, markerByEventId);
           publishEvents();
-          document.dispatchEvent(new CustomEvent(FILTERS_ACTIVE_EVENT, { detail: countActiveMapFilters(filters) }));
+          document.dispatchEvent(
+            new CustomEvent(FILTERS_ACTIVE_EVENT, { detail: countActiveMapFilters(filters) }),
+          );
         }
       } catch (error) {
-        console.error("Unable to load earthquake events", error);
+        console.error('Unable to load earthquake events', error);
       }
     }
 
@@ -199,7 +202,7 @@ const {
         atLimit = page.atLimit;
         renderEarthquakes(layer, events, markerByEventId);
       } catch (error) {
-        console.error("Unable to load more earthquake events", error);
+        console.error('Unable to load more earthquake events', error);
       } finally {
         if (currentRequest === requestId) {
           loadingMore = false;
@@ -212,7 +215,7 @@ const {
       try {
         await reload(filters);
       } catch (error) {
-        console.error("Unable to apply earthquake filters", error);
+        console.error('Unable to apply earthquake filters', error);
       } finally {
         document.dispatchEvent(new Event(FILTERS_COMPLETE_EVENT));
       }
@@ -222,51 +225,62 @@ const {
       void applyRequestedFilters((event as CustomEvent<EarthquakeMapFilters>).detail);
     };
     const handleEarthquakeFocus = (event: Event) => {
-      const { id, latitude, longitude } = (event as CustomEvent<{
-        id: string;
-        latitude: number;
-        longitude: number;
-      }>).detail;
+      const { id, latitude, longitude } = (
+        event as CustomEvent<{
+          id: string;
+          latitude: number;
+          longitude: number;
+        }>
+      ).detail;
       markerByEventId.get(id)?.openPopup();
       map.flyTo([latitude, longitude], Math.max(map.getZoom(), 10), { duration: 0.5 });
     };
     const handleRenderedEvents = (event: Event) => {
-      const { events, fitBounds } = (event as CustomEvent<{
-        events: EarthquakeMarker[];
-        fitBounds?: boolean;
-      }>).detail;
+      const { events, fitBounds } = (
+        event as CustomEvent<{
+          events: EarthquakeMarker[];
+          fitBounds?: boolean;
+        }>
+      ).detail;
       renderEarthquakes(layer, events, markerByEventId);
       if (fitBounds && events.length) {
-        map.fitBounds(
-          L.latLngBounds(events.map((item) => [item.latitude, item.longitude])),
-          { padding: [24, 24], maxZoom: 10 }
-        );
+        map.fitBounds(L.latLngBounds(events.map((item) => [item.latitude, item.longitude])), {
+          padding: [24, 24],
+          maxZoom: 10,
+        });
       }
     };
     const handleReviewStatusUpdated = (event: Event) => {
-      const { eventId, status } = (event as CustomEvent<{
-        eventId: string;
-        status: EarthquakeMarker["reviewStatus"];
-      }>).detail;
-      events = events.map((item) => item.id === eventId ? { ...item, reviewStatus: status } : item);
+      const { eventId, status } = (
+        event as CustomEvent<{
+          eventId: string;
+          status: EarthquakeMarker['reviewStatus'];
+        }>
+      ).detail;
+      events = events.map((item) =>
+        item.id === eventId ? { ...item, reviewStatus: status } : item,
+      );
       renderEarthquakes(layer, events, markerByEventId);
       publishEvents();
     };
 
-    document.addEventListener("quakestrike:filters", handleFilters);
+    document.addEventListener('quakestrike:filters', handleFilters);
     document.addEventListener(EARTHQUAKE_EVENTS_REQUEST_EVENT, publishEvents);
     document.addEventListener(EARTHQUAKE_FOCUS_EVENT, handleEarthquakeFocus);
     document.addEventListener(EARTHQUAKE_LOAD_MORE_EVENT, loadMore);
     document.addEventListener(EARTHQUAKE_RENDER_EVENTS_EVENT, handleRenderedEvents);
     document.addEventListener(EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT, handleReviewStatusUpdated);
-    map.once("unload", () => {
+    map.once('unload', () => {
       requestId++;
-      document.removeEventListener("quakestrike:filters", handleFilters);
+      document.removeEventListener('quakestrike:filters', handleFilters);
       document.removeEventListener(EARTHQUAKE_EVENTS_REQUEST_EVENT, publishEvents);
       document.removeEventListener(EARTHQUAKE_FOCUS_EVENT, handleEarthquakeFocus);
       document.removeEventListener(EARTHQUAKE_LOAD_MORE_EVENT, loadMore);
       document.removeEventListener(EARTHQUAKE_RENDER_EVENTS_EVENT, handleRenderedEvents);
-      document.removeEventListener(EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT, handleReviewStatusUpdated);
+      document.removeEventListener(
+        EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT,
+        handleReviewStatusUpdated,
+      );
     });
     void reload();
   }
@@ -278,19 +292,17 @@ const {
     }
   )._getIconUrl;
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl:
-      "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl:
-      "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   });
 
   // Detect mobile screen (≤768px) — checked once, outside the loop.
-  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+  const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
   // Read props from data-* attributes.
   // querySelectorAll handles multiple <Map /> instances on the same page.
-  document.querySelectorAll("[data-lat][data-lng][data-zoom]").forEach((el) => {
+  document.querySelectorAll('[data-lat][data-lng][data-zoom]').forEach((el) => {
     const htmlEl = el as HTMLElement;
     const lat = parseFloat(htmlEl.dataset.lat!);
     const lng = parseFloat(htmlEl.dataset.lng!);
@@ -298,12 +310,12 @@ const {
 
     const philippinesBounds = isMobile
       ? L.latLngBounds(
-          L.latLng(-2.7675, 114.1552),  // SW
-          L.latLng(25.6415, 129.9023),  // NE
+          L.latLng(-2.7675, 114.1552), // SW
+          L.latLng(25.6415, 129.9023), // NE
         )
       : L.latLngBounds(
-          L.latLng(2.1089, 101.9971),   // SW
-          L.latLng(22.2891, 144.1846),  // NE
+          L.latLng(2.1089, 101.9971), // SW
+          L.latLng(22.2891, 144.1846), // NE
         );
 
     // On mobile, use the optimized geographic center of the Philippines.
@@ -322,7 +334,7 @@ const {
       attributionControl: false,
     });
 
-    L.control.attribution({ position: "bottomleft" }).addTo(map);
+    L.control.attribution({ position: 'bottomleft' }).addTo(map);
 
     void addMapBasemap(L, map);
 
@@ -339,14 +351,12 @@ const {
       });
     });
     resizeObserver.observe(htmlEl);
-    map.once("unload", () => resizeObserver.disconnect());
+    map.once('unload', () => resizeObserver.disconnect());
 
     // Defer the event by one animation frame so all other component scripts
     // (e.g. Experiment.astro) have finished registering their listeners first.
     requestAnimationFrame(() => {
-      htmlEl.dispatchEvent(
-        new CustomEvent("leaflet:ready", { detail: { map }, bubbles: true })
-      );
+      htmlEl.dispatchEvent(new CustomEvent('leaflet:ready', { detail: { map }, bubbles: true }));
     });
   });
 </script>
