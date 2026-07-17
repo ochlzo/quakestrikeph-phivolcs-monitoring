@@ -19,13 +19,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  return parts.length > 1
-    ? `${parts[0][0]}${parts.at(-1)![0]}`.toUpperCase()
-    : (parts[0]?.slice(0, 2).toUpperCase() ?? "PH")
-}
-
 export function NavUser({ user }: { user: { name: string; email: string } }) {
   const { isMobile } = useSidebar()
   const [name, setName] = React.useState(user.name)
@@ -59,14 +52,16 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton
+                type="button"
                 size="lg"
-                tooltip="Operator profile"
-                className="md:h-8 md:p-0 data-open:bg-sidebar-accent"
+                aria-label="Operator profile"
+                title="Operator profile"
+                className="md:h-8 md:p-0 data-popup-open:bg-sidebar-accent"
               />
             }
           >
             <Avatar className="size-8 rounded-lg">
-              <AvatarFallback className="rounded-lg">{initials(name)}</AvatarFallback>
+              <AvatarFallback className="rounded-lg"><UserRoundIcon /></AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{name || "Operator"}</span>
