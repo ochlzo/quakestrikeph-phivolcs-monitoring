@@ -27,11 +27,9 @@ const probability = (value: number | null) => value === null ? 'Unavailable' : P
 <Layout title="Forecast monitor">
 	<section class="page-heading">
 		<div>
-			<p class="eyebrow">Operations queue</p>
 			<h1>Forecast monitoring</h1>
 			<p>Review current probability estimates before recording an assessment or preparing an alert.</p>
 		</div>
-		<div class="freshness"><span aria-hidden="true"></span>Server-rendered current data</div>
 	</section>
 
 	<section class="stat-grid" aria-label="Queue summary">
@@ -48,7 +46,7 @@ const probability = (value: number | null) => value === null ? 'Unavailable' : P
 		</div>
 	) : (
 		<section class="panel">
-			<div class="panel-heading"><div><p class="eyebrow">Current revisions</p><h2>Review queue</h2></div><span>{forecasts.length} records</span></div>
+			<div class="panel-heading"><div><h2>Review queue</h2></div><span>{forecasts.length} records</span></div>
 			{forecasts.length ? (
 				<div class="forecast-list">
 					{forecasts.map((item) => {
