@@ -13,6 +13,11 @@ The repository currently contains a working first review slice:
 - Astro SSR with the standalone Node adapter
 - a server-rendered forecast queue backed by Supabase
 - a forecast review page with editable pre-written assessments
+- a map monitoring workspace with explicit 50-row pagination up to 2,000 events
+- a required child forecast-details sidebar and shared review dialog
+- iframe-ready forecast discussion and observation playback
+- audit-log and raw-event list pages
+- a minimal server-managed operator display profile
 - review statuses `PENDING_REVIEW`, `DRAFT`, `REVIEWED_NO_ALERT`, and `REVIEWED_FOR_ALERT`
 - server-side review persistence and audit logging
 - Cloudflare Access JWT validation in Astro middleware
@@ -35,7 +40,7 @@ Implemented now:
 
 Still deferred:
 
-- live map, playback observations, and full source-freshness indicators
+- full source-freshness indicators beyond forecast playback status
 - alert composer, recipients, delivery channels, confirmation, retries, and corrections
 - alert history and delivery-result screens
 - organization IdP integration, independent MFA, and PHIVOLCS CIDR/VPN enforcement
@@ -139,7 +144,8 @@ Sending an alert does not require another PHIVOLCS approver. Keep a final confir
 - `src/lib/cloudflare-access.ts` validates `Cf-Access-Jwt-Assertion` with Cloudflare JWKS and checks signature, issuer, audience, expiry, and email. Never replace this with trust in `Cf-Access-Authenticated-User-Email` alone.
 - Missing or invalid Access identity returns `401 Unauthorized`.
 - A mutation whose `Origin` does not exactly match `PORTAL_ORIGIN` returns `403 Forbidden`.
-- `PORTAL_ORIGIN` must be the exact browser origin. Use the public HTTPS hostname through the tunnel and `http://localhost:4321` only for local `pnpm dev`.
+- `PORTAL_ORIGIN` must be the exact browser origin. Use the public HTTPS hostname through the tunnel and `http://localhost:4322` only for local `pnpm dev`; port `4321` is reserved for the public frontend used by the development forecast iframe.
+- Forecast iframes always load from `https://quakestrikeph.qzz.io`; do not add a localhost or environment-variable fallback.
 - `DEV_AUTH_EMAIL` is a local-development override only. Production Compose runs with `NODE_ENV=production` and does not pass it to the app. Never add it to the production service environment.
 - The Compose `app` service uses `expose`, not `ports`; keep it unreachable from host ports.
 - The runtime image runs as the non-root `node` user.
@@ -152,9 +158,11 @@ For OTP policies, allow explicit operator email addresses. Do not use `Include -
 
 - Source tables already expected in Supabase: `RawEarthquakeEvents` and `SeisPredictions_v1`.
 - Portal migration: `supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql`.
+- Operator profile migration: `supabase/migrations/20260717090000_add_operator_profiles.sql`.
 - `forecast_reviews` is unique on `(event_id, forecast_created_at)`, preserving a separate review per forecast revision.
 - `audit_logs` records the authenticated email, path, method, timestamp, and mutation metadata.
-- Both portal tables have RLS enabled with no browser policies. Access is intentionally through server-side Supabase credentials only.
+- All portal-owned tables have RLS enabled with no browser policies. Access is intentionally through server-side Supabase credentials only.
+- `operator_profiles` stores only verified email, display name, and timestamps; profile mutations derive email from the Access JWT and write an audit row.
 - Review and query logic belongs in `src/lib/portal-data.ts`, not in UI components.
 
 Do not assume that the migration file has been applied to the linked remote project. Check migration history or the live schema before debugging review persistence.
@@ -190,13 +198,13 @@ pnpm check
 pnpm build
 ```
 
-For local UI work, copy `.env.example` to `.env`, use `PORTAL_ORIGIN=http://localhost:4321`, set a non-production `DEV_AUTH_EMAIL`, and run:
+For local UI work, copy `.env.example` to `.env`, use `PORTAL_ORIGIN=http://localhost:4322`, set a non-production `DEV_AUTH_EMAIL`, and run:
 
 ```powershell
 pnpm dev
 ```
 
-For the real Cloudflare path, use the public HTTPS origin, valid Cloudflare and Supabase values, and run:
+For the real Cloudflare path, use the public HTTPS portal origin, valid Cloudflare and Supabase values, and run:
 
 ```powershell
 docker compose --env-file .env up --build -d

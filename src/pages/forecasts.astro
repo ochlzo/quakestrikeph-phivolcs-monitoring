@@ -1,0 +1,16 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
+import { getForecastQueue, type ForecastCase } from '@/lib/portal-data';
+import { REVIEW_STATUS_LABELS } from '@/lib/reviews';
+const limits = [50, 100, 250, 500, 1000, 2000];
+const requested = Number(Astro.url.searchParams.get('limit') ?? 50);
+const limit = limits.includes(requested) ? requested : 50;
+let all: ForecastCase[] = []; let error = '';
+try { all = await getForecastQueue(2000); } catch (reason) { error = reason instanceof Error ? reason.message : 'Could not load forecasts.'; }
+const rows = all.slice(0, limit);
+const PHT = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' });
+---
+<Layout title="Forecast list"><main class="flex-1 p-4 sm:p-6"><div class="mx-auto max-w-7xl space-y-5"><header><p class="text-xs font-semibold uppercase tracking-wide text-primary">Review queue</p><h1 class="text-2xl font-semibold">Forecast list</h1><p class="text-sm text-muted-foreground">Current model revisions and their PHIVOLCS review status.</p></header>
+{error ? <div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">{error}</div> : <section class="overflow-hidden rounded-xl border bg-card shadow-sm"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th class="p-3">Event</th><th class="p-3">Forecast generated</th><th class="p-3">24-hour chance</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead><tbody class="divide-y">{rows.map((item) => { const status = item.review?.status ?? 'PENDING_REVIEW'; return <tr><td class="p-3"><strong>M{item.event.Magnitude.toFixed(1)} · {item.event.Location ?? 'Unknown location'}</strong><span class="block text-xs text-muted-foreground">{item.event.Depth} km deep</span></td><td class="p-3">{PHT.format(new Date(item.forecast.created_at))} PHT</td><td class="p-3 font-semibold">{item.forecast.aftershock_24h === null ? 'Unavailable' : `${(item.forecast.aftershock_24h * 100).toFixed(1)}%`}</td><td class="p-3"><Badge className="bg-accent text-primary">{REVIEW_STATUS_LABELS[status]}</Badge></td><td class="p-3 text-right"><a class={buttonVariants({ variant: 'outline', size: 'sm' })} href={`/reviews/${encodeURIComponent(item.event.id)}`}>Open review</a></td></tr>; })}</tbody></table></div><form class="flex items-center justify-between gap-3 border-t p-3 text-sm" method="get"><label class="flex items-center gap-2">Show data<select name="limit" class="h-8 rounded-md border bg-background px-2">{limits.map((value) => <option value={value} selected={value === limit}>{value.toLocaleString()}</option>)}</select></label><span class="text-muted-foreground">{rows.length.toLocaleString()} / {all.length.toLocaleString()}</span><button class={buttonVariants({ variant: 'outline', size: 'sm' })}>Apply</button></form></section>}</div></main></Layout>

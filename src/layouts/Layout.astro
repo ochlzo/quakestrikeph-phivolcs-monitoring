@@ -1,12 +1,19 @@
 ---
 import '../styles/global.css';
+import { PortalShell } from '../components/portal-shell';
+import { getOperatorProfile } from '../lib/portal-data';
 
 interface Props {
 	title?: string;
+	shell?: boolean;
 }
 
-const { title = 'Forecast monitor' } = Astro.props;
+const { title = 'Forecast monitor', shell = true } = Astro.props;
 const operatorEmail = Astro.locals.user?.email;
+let operatorDisplayName = '';
+if (shell && operatorEmail) {
+	try { operatorDisplayName = (await getOperatorProfile(operatorEmail))?.display_name ?? ''; } catch { operatorDisplayName = ''; }
+}
 ---
 
 <!doctype html>
@@ -20,14 +27,10 @@ const operatorEmail = Astro.locals.user?.email;
 		<title>{title} · QuakeStrike PH</title>
 	</head>
 	<body>
-		<header class="topbar">
-			<a class="brand" href="/" aria-label="QuakeStrike PH forecast monitor">
-				<span class="brand-mark" aria-hidden="true">QS</span>
-				<span><strong>QuakeStrike PH</strong><small>PHIVOLCS forecast monitor</small></span>
-			</a>
-			{operatorEmail && <div class="operator"><span>Authenticated operator</span><strong>{operatorEmail}</strong></div>}
-		</header>
-		<main class="page-shell"><slot /></main>
-		<footer class="footer">Private operations portal · All operational timestamps use Philippine Time</footer>
+		{shell ? (
+			<PortalShell client:load activePath={Astro.url.pathname} operatorEmail={operatorEmail ?? ''} operatorDisplayName={operatorDisplayName}>
+				<slot />
+			</PortalShell>
+		) : <slot />}
 	</body>
 </html>

@@ -1,12 +1,16 @@
 // @ts-check
 import { defineConfig, envField } from "astro/config";
 import node from "@astrojs/node";
+import react from "@astrojs/react";
+import tailwindcss from "@tailwindcss/vite";
 
 // https://astro.build/config
 export default defineConfig({
   output: "server",
   adapter: node({ mode: "standalone" }),
-  server: { host: true },
+  integrations: [react()],
+  vite: { plugins: [tailwindcss()] },
+  server: { host: true, port: 4322 },
   security: { checkOrigin: false },
   env: {
     schema: {
@@ -39,6 +43,11 @@ export default defineConfig({
         optional: true,
       }),
       DEV_AUTH_EMAIL: envField.string({
+        context: "server",
+        access: "secret",
+        optional: true,
+      }),
+      GOOGLE_MAPS_API_KEY: envField.string({
         context: "server",
         access: "secret",
         optional: true,

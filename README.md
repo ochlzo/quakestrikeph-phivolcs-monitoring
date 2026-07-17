@@ -1,13 +1,13 @@
 # QuakeStrike PH - PHIVOLCS Forecast Monitor
 
-Private Astro SSR portal for authorized PHIVOLCS operators to inspect current forecast revisions and record reviews. Cloudflare Access protects the public hostname, the application independently validates the Access JWT, and Supabase access remains server-side.
+Private Astro SSR portal for authorized PHIVOLCS operators to monitor earthquake events, inspect forecast discussions and playback, maintain a review queue, and record reviews. Cloudflare Access protects the public hostname, the application independently validates the Access JWT, and Supabase access remains server-side.
 
 ```text
 User -> Cloudflare Access -> Cloudflare Tunnel -> cloudflared container
      -> app:4321 on the Docker network -> Supabase
 ```
 
-The current implementation provides the forecast queue and review workflow. `REVIEWED_FOR_ALERT` records that an operator wants to prepare an alert; alert composition and delivery are not implemented yet.
+The current implementation provides the map monitor, explicit event pagination, forecast-details sidebar, forecast discussion/playback, review dialog and full-page review workflow, audit/raw-event lists, and a minimal operator display profile. `REVIEWED_FOR_ALERT` records review intent only; alert composition and delivery are not implemented.
 
 ## Prerequisites
 
@@ -27,13 +27,14 @@ Copy `.env.example` to `.env` and replace every placeholder. `.env` is ignored b
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `PORTAL_ORIGIN` | Yes | Exact browser origin used for mutation-origin checks, such as `https://monitor.example.com` or `http://localhost:4321` for `pnpm dev`. |
+| `PORTAL_ORIGIN` | Yes | Exact browser origin used for mutation-origin checks, such as `https://monitor.example.com` or `http://localhost:4322` for `pnpm dev`. |
 | `CLOUDFLARED_TOKEN` | Compose | Secret token for the remotely managed Cloudflare Tunnel connector. |
 | `CF_ACCESS_AUD` | Production | Audience tag from the self-hosted Cloudflare Access application. This is not the tunnel token. |
 | `CF_ACCESS_TEAM_DOMAIN` | Production | Exact team origin, such as `https://your-team.cloudflareaccess.com`. |
 | `ASTRO_PORT` | No | Internal app port; defaults to `4321`. Do not publish it on the host. |
 | `SUPABASE_URL` | Yes | Supabase project URL used by server-side code. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Server secret (`sb_secret_...` or legacy service-role key). An `sb_publishable_...` key will be rejected. |
+| `GOOGLE_MAPS_API_KEY` | No | Server-only Google tile key. The map falls back to OpenStreetMap when omitted or unavailable. |
 | `DEV_AUTH_EMAIL` | Local dev only | Development identity for `pnpm dev`. Production Compose ignores it. |
 
 Never commit `.env`, log the tunnel token or Supabase secret, or expose the Supabase secret through a public Astro environment variable.
@@ -87,16 +88,18 @@ The connector requires outbound connectivity to Cloudflare on TCP/UDP port `7844
 
 ## Supabase migration
 
-The portal migration is:
+The portal migrations are:
 
 ```text
 supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql
+supabase/migrations/20260717090000_add_operator_profiles.sql
 ```
 
 It creates:
 
 - `forecast_reviews`, unique per event and forecast generation time
 - `audit_logs`, for server-side operator mutation records
+- `operator_profiles`, containing verified email and editable display name only
 
 Both tables have RLS enabled and intentionally have no browser policies.
 
@@ -136,7 +139,7 @@ pnpm audit --prod
 For development without Cloudflare, set:
 
 ```env
-PORTAL_ORIGIN=http://localhost:4321
+PORTAL_ORIGIN=http://localhost:4322
 DEV_AUTH_EMAIL=operator@example.com
 ```
 
@@ -146,7 +149,7 @@ Then run:
 pnpm dev
 ```
 
-Open `http://localhost:4321`. The development identity works only when Astro is running in development mode.
+Open `http://localhost:4322`. The development identity works only when Astro is running in development mode.
 
 ## Test the real Cloudflare path
 
@@ -233,6 +236,16 @@ pnpm build
 docker compose --env-file .env config --quiet
 ```
 
+## Portal routes
+
+- `/` — map monitor, explicit event count, event statuses, and forecast-details child sidebar
+- `/forecasts` — current forecast review queue
+- `/events` — read-only raw event list
+- `/logs` — operator mutation audit log
+- `/reviews/<event-id>` — standalone forecast review
+
+Review dialogs always embed `https://quakestrikeph.qzz.io/forecast?event=<event-id>`.
+
 ## Deferred scope
 
-The current application stops after recording `REVIEWED_FOR_ALERT`. Do not add real alert delivery until recipient selection, delivery channels, provider credentials, confirmation behavior, and audit requirements are verified. The map, playback, complete freshness indicators, alert history, and UI refinement also remain future work.
+The Alerts navigation item is intentionally disabled. Do not add alert recipients, delivery channels, providers, retries, corrections, or send behavior until those contracts are separately approved.

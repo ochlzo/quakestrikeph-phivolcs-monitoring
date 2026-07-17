@@ -1,0 +1,352 @@
+---
+/**
+ * Map.astro
+ *
+ * A Leaflet map component that defaults to showing the Philippines,
+ * loading Google Maps tiles with an OpenStreetMap fallback.
+ *
+ * Props:
+ *   lat     - Initial center latitude  (default: 13.0 — Philippines-ish)
+ *   lng     - Initial center longitude (default: 115.5 — Philippines-ish)
+ *   zoom    - Initial zoom level       (default: 6)
+ *   height  - CSS height of the map    (default: "500px")
+ *   id      - Unique DOM id for the map container (default: "leaflet-map")
+ */
+interface Props {
+  lat?: number;
+  lng?: number;
+  zoom?: number;
+  height?: string;
+  id?: string;
+}
+
+const {
+  lat = 12.3937,
+  lng = 123.0908,
+  zoom = 7,
+  height = "500px",
+  id = "leaflet-map",
+} = Astro.props;
+---
+
+<div
+  id={id}
+  data-lat={lat}
+  data-lng={lng}
+  data-zoom={zoom}
+  style={`position: relative; height: ${height}; width: 100%; overflow: hidden;`}
+  aria-label="Interactive map of the Philippines"
+  role="application"
+></div>
+
+<script>
+  import L from "leaflet";
+  import { getRecentEarthquakeMarkerPage, type EarthquakeMarker } from "../data/earthquakes";
+  import { addMapBasemap } from "../lib/map-basemap";
+  import {
+    FILTERS_COMPLETE_EVENT,
+    EARTHQUAKE_EVENTS_REQUEST_EVENT,
+    EARTHQUAKE_EVENTS_UPDATED_EVENT,
+    EARTHQUAKE_FOCUS_EVENT,
+    EARTHQUAKE_LOAD_MORE_EVENT,
+    EARTHQUAKE_RENDER_EVENTS_EVENT,
+    EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT,
+    EARTHQUAKE_SELECTED_EVENT,
+    FILTERS_ACTIVE_EVENT,
+    FORECAST_REVIEW_EVENT,
+    countActiveMapFilters,
+    magnitudeMarkerBand,
+    type EarthquakeMapFilters,
+  } from "../lib/earthquake-map-filters";
+
+  function addEventDetail(
+    list: HTMLDListElement,
+    label: string,
+    value: string,
+  ) {
+    const term = document.createElement("dt");
+    term.className = "text-muted-foreground";
+    term.textContent = label;
+    const detail = document.createElement("dd");
+    detail.className = "text-left font-medium";
+    detail.textContent = value;
+    list.append(term, detail);
+  }
+
+  function createCloudAlertIcon() {
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.classList.add("size-4", "shrink-0");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("fill", "none");
+    icon.setAttribute("stroke", "currentColor");
+    icon.setAttribute("stroke-width", "2");
+    icon.setAttribute("stroke-linecap", "round");
+    icon.setAttribute("stroke-linejoin", "round");
+    icon.setAttribute("aria-hidden", "true");
+    icon.innerHTML = '<path d="M12 12v4"/><path d="M12 20h.01"/><path d="M8.128 16.949A7 7 0 1 1 15.71 8h1.79a1 1 0 0 1 0 9h-1.642"/>';
+    return icon;
+  }
+
+  function renderEarthquakes(
+    layer: L.LayerGroup,
+    events: EarthquakeMarker[],
+    markerByEventId: Map<string, L.CircleMarker>,
+  ) {
+    layer.clearLayers();
+    markerByEventId.clear();
+    events.forEach((event) => {
+      const popup = document.createElement("div");
+      popup.className = "min-w-60 space-y-3 text-sm";
+
+      const location = document.createElement("h2");
+      location.className = "text-center text-base font-semibold";
+      location.textContent = event.location ?? "Unknown location";
+
+      const details = document.createElement("dl");
+      details.className = "grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5";
+      addEventDetail(details, "Date", event.date);
+      addEventDetail(details, "Latitude", `${event.latitude.toFixed(2)}°`);
+      addEventDetail(details, "Longitude", `${event.longitude.toFixed(2)}°`);
+      addEventDetail(details, "Magnitude", event.magnitude.toFixed(1));
+      addEventDetail(details, "Depth", `${event.depth} km`);
+
+      popup.append(location, details);
+      if (!event.hasForecast) {
+        const forecastStatus = document.createElement("div");
+        forecastStatus.className = "flex items-center justify-center gap-1.5 text-muted-foreground";
+        const whyLink = document.createElement("a");
+        whyLink.href = "#";
+        whyLink.className = "underline underline-offset-4";
+        whyLink.textContent = "see why";
+        whyLink.addEventListener("click", (clickEvent) => clickEvent.preventDefault());
+        forecastStatus.append(createCloudAlertIcon(), "No forecast available ", whyLink);
+        popup.append(forecastStatus);
+      } else {
+        const discussionLink = document.createElement("a");
+        discussionLink.href = "#";
+        discussionLink.className = "block text-center font-medium text-primary underline underline-offset-4";
+        discussionLink.textContent = "View forecast discussion →";
+        discussionLink.addEventListener("click", (clickEvent) => {
+          clickEvent.preventDefault();
+          document.dispatchEvent(new CustomEvent(FORECAST_REVIEW_EVENT, { detail: event }));
+        });
+        popup.append(discussionLink);
+      }
+
+      const marker = L.circleMarker([event.latitude, event.longitude], {
+        className: `earthquake-marker earthquake-marker--magnitude-${magnitudeMarkerBand(event.magnitude)}`,
+        radius: 6,
+      })
+        .addTo(layer)
+        .bindPopup(popup, { minWidth: 260 });
+      marker.on("click", () => {
+        document.dispatchEvent(new CustomEvent(EARTHQUAKE_SELECTED_EVENT, { detail: event }));
+      });
+      markerByEventId.set(event.id, marker);
+    });
+  }
+
+  function setupEarthquakeLayer(map: L.Map) {
+    const layer = L.layerGroup().addTo(map);
+    const markerByEventId = new Map<string, L.CircleMarker>();
+    let requestId = 0;
+    let activeFilters: EarthquakeMapFilters | undefined;
+    let events: EarthquakeMarker[] = [];
+    let nextOffset = 0;
+    let hasMore = false;
+    let atLimit = false;
+    let loadingMore = false;
+
+    function publishEvents() {
+      document.dispatchEvent(new CustomEvent(EARTHQUAKE_EVENTS_UPDATED_EVENT, {
+        detail: { events, hasMore, atLimit, loadingMore },
+      }));
+    }
+
+    async function reload(filters?: EarthquakeMapFilters) {
+      const currentRequest = ++requestId;
+      activeFilters = filters;
+      loadingMore = false;
+
+      try {
+        const page = await getRecentEarthquakeMarkerPage(filters);
+        if (currentRequest === requestId) {
+          events = page.events;
+          nextOffset = page.nextOffset;
+          hasMore = page.hasMore;
+          atLimit = page.atLimit;
+          renderEarthquakes(layer, events, markerByEventId);
+          publishEvents();
+          document.dispatchEvent(new CustomEvent(FILTERS_ACTIVE_EVENT, { detail: countActiveMapFilters(filters) }));
+        }
+      } catch (error) {
+        console.error("Unable to load earthquake events", error);
+      }
+    }
+
+    async function loadMore() {
+      if (loadingMore || !hasMore || atLimit) return;
+      const currentRequest = requestId;
+      loadingMore = true;
+      publishEvents();
+
+      try {
+        const page = await getRecentEarthquakeMarkerPage(activeFilters, nextOffset);
+        if (currentRequest !== requestId) return;
+        events = [...events, ...page.events];
+        nextOffset = page.nextOffset;
+        hasMore = page.hasMore;
+        atLimit = page.atLimit;
+        renderEarthquakes(layer, events, markerByEventId);
+      } catch (error) {
+        console.error("Unable to load more earthquake events", error);
+      } finally {
+        if (currentRequest === requestId) {
+          loadingMore = false;
+          publishEvents();
+        }
+      }
+    }
+
+    async function applyRequestedFilters(filters: EarthquakeMapFilters) {
+      try {
+        await reload(filters);
+      } catch (error) {
+        console.error("Unable to apply earthquake filters", error);
+      } finally {
+        document.dispatchEvent(new Event(FILTERS_COMPLETE_EVENT));
+      }
+    }
+
+    const handleFilters = (event: Event) => {
+      void applyRequestedFilters((event as CustomEvent<EarthquakeMapFilters>).detail);
+    };
+    const handleEarthquakeFocus = (event: Event) => {
+      const { id, latitude, longitude } = (event as CustomEvent<{
+        id: string;
+        latitude: number;
+        longitude: number;
+      }>).detail;
+      markerByEventId.get(id)?.openPopup();
+      map.flyTo([latitude, longitude], Math.max(map.getZoom(), 10), { duration: 0.5 });
+    };
+    const handleRenderedEvents = (event: Event) => {
+      const { events, fitBounds } = (event as CustomEvent<{
+        events: EarthquakeMarker[];
+        fitBounds?: boolean;
+      }>).detail;
+      renderEarthquakes(layer, events, markerByEventId);
+      if (fitBounds && events.length) {
+        map.fitBounds(
+          L.latLngBounds(events.map((item) => [item.latitude, item.longitude])),
+          { padding: [24, 24], maxZoom: 10 }
+        );
+      }
+    };
+    const handleReviewStatusUpdated = (event: Event) => {
+      const { eventId, status } = (event as CustomEvent<{
+        eventId: string;
+        status: EarthquakeMarker["reviewStatus"];
+      }>).detail;
+      events = events.map((item) => item.id === eventId ? { ...item, reviewStatus: status } : item);
+      renderEarthquakes(layer, events, markerByEventId);
+      publishEvents();
+    };
+
+    document.addEventListener("quakestrike:filters", handleFilters);
+    document.addEventListener(EARTHQUAKE_EVENTS_REQUEST_EVENT, publishEvents);
+    document.addEventListener(EARTHQUAKE_FOCUS_EVENT, handleEarthquakeFocus);
+    document.addEventListener(EARTHQUAKE_LOAD_MORE_EVENT, loadMore);
+    document.addEventListener(EARTHQUAKE_RENDER_EVENTS_EVENT, handleRenderedEvents);
+    document.addEventListener(EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT, handleReviewStatusUpdated);
+    map.once("unload", () => {
+      requestId++;
+      document.removeEventListener("quakestrike:filters", handleFilters);
+      document.removeEventListener(EARTHQUAKE_EVENTS_REQUEST_EVENT, publishEvents);
+      document.removeEventListener(EARTHQUAKE_FOCUS_EVENT, handleEarthquakeFocus);
+      document.removeEventListener(EARTHQUAKE_LOAD_MORE_EVENT, loadMore);
+      document.removeEventListener(EARTHQUAKE_RENDER_EVENTS_EVENT, handleRenderedEvents);
+      document.removeEventListener(EARTHQUAKE_REVIEW_STATUS_UPDATED_EVENT, handleReviewStatusUpdated);
+    });
+    void reload();
+  }
+
+  // Fix missing default marker icons when bundled (Leaflet asset path issue).
+  delete (
+    L.Icon.Default.prototype as L.Icon.Default & {
+      _getIconUrl?: () => string;
+    }
+  )._getIconUrl;
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl:
+      "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl:
+      "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  });
+
+  // Detect mobile screen (≤768px) — checked once, outside the loop.
+  const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+  // Read props from data-* attributes.
+  // querySelectorAll handles multiple <Map /> instances on the same page.
+  document.querySelectorAll("[data-lat][data-lng][data-zoom]").forEach((el) => {
+    const htmlEl = el as HTMLElement;
+    const lat = parseFloat(htmlEl.dataset.lat!);
+    const lng = parseFloat(htmlEl.dataset.lng!);
+    const zoom = parseInt(htmlEl.dataset.zoom!, 10);
+
+    const philippinesBounds = isMobile
+      ? L.latLngBounds(
+          L.latLng(-2.7675, 114.1552),  // SW
+          L.latLng(25.6415, 129.9023),  // NE
+        )
+      : L.latLngBounds(
+          L.latLng(2.1089, 101.9971),   // SW
+          L.latLng(22.2891, 144.1846),  // NE
+        );
+
+    // On mobile, use the optimized geographic center of the Philippines.
+    // Desktop uses the prop-driven center.
+    const center: [number, number] = isMobile ? [9.6012, 122.2564] : [lat, lng];
+    const initialZoom = isMobile ? 6 : zoom;
+    const minZoom = 6;
+
+    const map = L.map(htmlEl, {
+      center,
+      zoom: initialZoom,
+      minZoom,
+      maxBounds: philippinesBounds,
+      maxBoundsViscosity: 1.0,
+      zoomControl: false,
+      attributionControl: false,
+    });
+
+    L.control.attribution({ position: "bottomleft" }).addTo(map);
+
+    void addMapBasemap(L, map);
+
+    setupEarthquakeLayer(map);
+
+    // The sidebar changes this element's width without triggering a window
+    // resize. Keep Leaflet's viewport in sync through the full transition so
+    // it redraws newly exposed space instead of leaving a blank edge.
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize({
+        animate: false,
+        pan: true,
+        debounceMoveend: true,
+      });
+    });
+    resizeObserver.observe(htmlEl);
+    map.once("unload", () => resizeObserver.disconnect());
+
+    // Defer the event by one animation frame so all other component scripts
+    // (e.g. Experiment.astro) have finished registering their listeners first.
+    requestAnimationFrame(() => {
+      htmlEl.dispatchEvent(
+        new CustomEvent("leaflet:ready", { detail: { map }, bubbles: true })
+      );
+    });
+  });
+</script>
