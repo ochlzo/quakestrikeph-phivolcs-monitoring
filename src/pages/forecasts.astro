@@ -1,16 +1,144 @@
 ---
 import Layout from '@/layouts/Layout.astro';
+import { TableFilterMenu } from '@/components/table-filter-menu';
+import TablePagination from '@/components/table-pagination.astro';
+import TableToolbar from '@/components/table-toolbar.astro';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import { getForecastQueue, type ForecastCase } from '@/lib/portal-data';
-import { REVIEW_STATUS_LABELS } from '@/lib/reviews';
-const limits = [50, 100, 250, 500, 1000, 2000];
-const requested = Number(Astro.url.searchParams.get('limit') ?? 50);
-const limit = limits.includes(requested) ? requested : 50;
-let all: ForecastCase[] = []; let error = '';
-try { all = await getForecastQueue(2000); } catch (reason) { error = reason instanceof Error ? reason.message : 'Could not load forecasts.'; }
-const rows = all.slice(0, limit);
+import { getForecastPage, type ForecastListRow } from '@/lib/portal-data';
+import { FORECAST_LIKELIHOODS } from '@/lib/earthquake-map-filters';
+import { MAGNITUDE_RANGE_OPTIONS, magnitudeSelectionsToRanges } from '@/lib/magnitude-ranges';
+import { REVIEW_STATUSES, REVIEW_STATUS_LABELS, type ReviewStatus } from '@/lib/reviews';
+import { allowedValues, dateParam, optionalNumberParam, parseTableRequest } from '@/lib/table-query';
+
+const request = parseTableRequest(Astro.url);
+const params = Astro.url.searchParams;
+const filterApplied = params.get('applied') === '1';
+const magnitudeValues = allowedValues(params, 'magnitude', MAGNITUDE_RANGE_OPTIONS.map(({ value }) => value));
+const selectedStatuses = allowedValues(params, 'status', REVIEW_STATUSES);
+const selectedAftershock = allowedValues(params, 'aftershock', FORECAST_LIKELIHOODS);
+const selectedM5 = allowedValues(params, 'm5', FORECAST_LIKELIHOODS);
+const reviewStatuses = filterApplied && selectedStatuses.length ? selectedStatuses : [...REVIEW_STATUSES];
+const aftershockLikelihoods = filterApplied && selectedAftershock.length ? selectedAftershock : [...FORECAST_LIKELIHOODS];
+const m5Likelihoods = filterApplied && selectedM5.length ? selectedM5 : [...FORECAST_LIKELIHOODS];
+const depthFrom = optionalNumberParam(params, 'depth_from');
+const depthTo = optionalNumberParam(params, 'depth_to');
+const dateFrom = dateParam(params, 'date_from');
+const dateTo = dateParam(params, 'date_to');
+const minimumStrongest = optionalNumberParam(params, 'minimum_strongest');
+const activeFilterCount = [
+	magnitudeValues.length > 0,
+	depthFrom !== null || depthTo !== null,
+	dateFrom !== null || dateTo !== null,
+	reviewStatuses.length !== REVIEW_STATUSES.length,
+	aftershockLikelihoods.length !== FORECAST_LIKELIHOODS.length,
+	m5Likelihoods.length !== FORECAST_LIKELIHOODS.length,
+	minimumStrongest !== null,
+].filter(Boolean).length;
+
+let page = request.page;
+let rows: ForecastListRow[] = [];
+let total = 0;
+let error = '';
+async function load(offset: number) {
+	return getForecastPage({
+		query: request.query,
+		reviewStatuses: reviewStatuses as ReviewStatus[],
+		magnitudeRanges: magnitudeSelectionsToRanges(magnitudeValues),
+		depthFrom,
+		depthTo,
+		dateFrom,
+		dateTo,
+		aftershockLikelihoods,
+		m5Likelihoods,
+		minimumStrongest,
+		limit: request.limit,
+		offset,
+	});
+}
+try {
+	({ rows, total } = await load(request.offset));
+	const lastPage = Math.max(1, Math.ceil(total / request.limit));
+	if (page > lastPage) {
+		page = lastPage;
+		({ rows, total } = await load((page - 1) * request.limit));
+	}
+} catch (reason) {
+	error = reason instanceof Error ? reason.message : 'Could not load forecasts.';
+}
+
+const resetParams = new URLSearchParams({ limit: String(request.limit) });
+if (request.query) resetParams.set('q', request.query);
+const resetHref = `/forecasts?${resetParams}`;
 const PHT = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila' });
+const fieldClass = 'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 ---
-<Layout title="Forecast list"><main class="flex-1 p-4 sm:p-6"><div class="mx-auto max-w-7xl space-y-5"><header><p class="text-xs font-semibold uppercase tracking-wide text-primary">Review queue</p><h1 class="text-2xl font-semibold">Forecast list</h1><p class="text-sm text-muted-foreground">Current model revisions and their PHIVOLCS review status.</p></header>
-{error ? <div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">{error}</div> : <section class="overflow-hidden rounded-xl border bg-card shadow-sm"><div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead class="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th class="p-3">Event</th><th class="p-3">Forecast generated</th><th class="p-3">24-hour chance</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead><tbody class="divide-y">{rows.map((item) => { const status = item.review?.status ?? 'PENDING_REVIEW'; return <tr><td class="p-3"><strong>M{item.event.Magnitude.toFixed(1)} · {item.event.Location ?? 'Unknown location'}</strong><span class="block text-xs text-muted-foreground">{item.event.Depth} km deep</span></td><td class="p-3">{PHT.format(new Date(item.forecast.created_at))} PHT</td><td class="p-3 font-semibold">{item.forecast.aftershock_24h === null ? 'Unavailable' : `${(item.forecast.aftershock_24h * 100).toFixed(1)}%`}</td><td class="p-3"><Badge className="bg-accent text-primary">{REVIEW_STATUS_LABELS[status]}</Badge></td><td class="p-3 text-right"><a class={buttonVariants({ variant: 'outline', size: 'sm' })} href={`/reviews/${encodeURIComponent(item.event.id)}`}>Open review</a></td></tr>; })}</tbody></table></div><form class="flex items-center justify-between gap-3 border-t p-3 text-sm" method="get"><label class="flex items-center gap-2">Show data<select name="limit" class="h-8 rounded-md border bg-background px-2">{limits.map((value) => <option value={value} selected={value === limit}>{value.toLocaleString()}</option>)}</select></label><span class="text-muted-foreground">{rows.length.toLocaleString()} / {all.length.toLocaleString()}</span><button class={buttonVariants({ variant: 'outline', size: 'sm' })}>Apply</button></form></section>}</div></main></Layout>
+
+<Layout title="Forecast list">
+	<main class="flex-1 p-4 sm:p-6">
+		<div class="mx-auto max-w-7xl space-y-5">
+			<header>
+				<p class="text-xs font-semibold uppercase tracking-wide text-primary">Review queue</p>
+				<h1 class="text-2xl font-semibold">Forecast list</h1>
+				<p class="text-sm text-muted-foreground">Current model revisions and their PHIVOLCS review status.</p>
+			</header>
+			{error ? (
+				<div role="alert" class="rounded-lg border bg-red-50 p-4 text-destructive">{error}</div>
+			) : (
+				<section class="overflow-hidden rounded-xl border bg-card shadow-sm">
+					<TableToolbar url={Astro.url} query={request.query} placeholder="Search location or event ID" pageSize={request.limit}>
+						<TableFilterMenu client:load title="Filter forecasts" description="Mainshock, forecast, and review criteria." activeFilterCount={activeFilterCount}>
+							<form method="get">
+								<input type="hidden" name="q" value={request.query} />
+								<input type="hidden" name="limit" value={request.limit} />
+								<input type="hidden" name="applied" value="1" />
+								<input type="hidden" name="page" value="1" />
+								<div class="max-h-[min(70vh,36rem)] space-y-5 overflow-y-auto p-4 text-sm">
+								<fieldset class="space-y-2">
+									<legend class="font-semibold">Review status</legend>
+									{REVIEW_STATUSES.map((status) => <label class="flex items-center gap-2"><input type="checkbox" name="status" value={status} checked={reviewStatuses.includes(status)} />{REVIEW_STATUS_LABELS[status]}</label>)}
+								</fieldset>
+								<fieldset class="space-y-2">
+									<legend class="font-semibold">Mainshock magnitude</legend>
+									<div class="grid grid-cols-2 gap-2">
+										{MAGNITUDE_RANGE_OPTIONS.map((option) => <label class="flex items-center gap-2"><input type="checkbox" name="magnitude" value={option.value} checked={magnitudeValues.includes(option.value)} /><span class={`size-2.5 rounded-full ${option.colorClass}`}></span>{option.label}</label>)}
+									</div>
+								</fieldset>
+								<fieldset>
+									<legend class="mb-2 font-semibold">Mainshock depth (km)</legend>
+									<div class="grid grid-cols-2 gap-2"><input class={fieldClass} type="number" min="0" max={depthTo ?? undefined} name="depth_from" value={depthFrom ?? ''} placeholder="From" /><input class={fieldClass} type="number" min={depthFrom ?? 0} name="depth_to" value={depthTo ?? ''} placeholder="To" /></div>
+								</fieldset>
+								<fieldset>
+									<legend class="mb-2 font-semibold">Mainshock date range</legend>
+									<div class="grid grid-cols-2 gap-2"><input class={fieldClass} type="date" name="date_from" value={dateFrom ?? ''} max={dateTo ?? undefined} aria-label="Date from" /><input class={fieldClass} type="date" name="date_to" value={dateTo ?? ''} min={dateFrom ?? undefined} aria-label="Date to" /></div>
+								</fieldset>
+								<fieldset class="space-y-3">
+									<legend class="font-semibold">Forecast criteria</legend>
+									<div class="grid grid-cols-2 gap-3">
+										<div><p class="mb-1 font-medium">24h likelihood</p>{FORECAST_LIKELIHOODS.map((value) => <label class="flex items-center gap-2 py-0.5 capitalize"><input type="checkbox" name="aftershock" value={value} checked={aftershockLikelihoods.includes(value)} />{value}</label>)}</div>
+										<div><p class="mb-1 font-medium">M5+ likelihood</p>{FORECAST_LIKELIHOODS.map((value) => <label class="flex items-center gap-2 py-0.5 capitalize"><input type="checkbox" name="m5" value={value} checked={m5Likelihoods.includes(value)} />{value}</label>)}</div>
+									</div>
+									<input class={fieldClass} type="number" min="0" max="10" step="0.1" name="minimum_strongest" value={minimumStrongest ?? ''} placeholder="Minimum estimated strongest" aria-label="Minimum estimated strongest aftershock" />
+								</fieldset>
+								</div>
+								<footer class="grid grid-cols-2 gap-2 border-t p-2">
+									<a href={resetHref} class={buttonVariants({ variant: 'outline', size: 'sm' })}>Reset filters</a>
+									<button class={buttonVariants({ size: 'sm' })}>Apply filters</button>
+								</footer>
+							</form>
+						</TableFilterMenu>
+					</TableToolbar>
+					<div class="overflow-x-auto">
+								<table class="w-full text-left text-sm">
+									<thead class="bg-muted/60 text-xs uppercase text-muted-foreground"><tr><th class="p-3">Event</th><th class="p-3">Forecast generated</th><th class="p-3">24-hour chance</th><th class="p-3">Status</th><th class="p-3"></th></tr></thead>
+									<tbody class="divide-y">
+										{rows.length ? rows.map((item) => <tr><td class="p-3"><strong>M{item.magnitude.toFixed(1)} · {item.location ?? 'Unknown location'}</strong><span class="block text-xs text-muted-foreground">{item.event_id} · {item.depth} km deep</span></td><td class="p-3 whitespace-nowrap">{PHT.format(new Date(item.created_at))} PHT</td><td class="p-3 font-semibold">{item.aftershock_24h === null ? 'Unavailable' : `${(item.aftershock_24h * 100).toFixed(1)}%`}</td><td class="p-3"><Badge className="bg-accent text-primary">{REVIEW_STATUS_LABELS[item.review_status]}</Badge></td><td class="p-3 text-right"><a class={buttonVariants({ variant: 'outline', size: 'sm' })} href={`/reviews/${encodeURIComponent(item.event_id)}`}>Open review</a></td></tr>) : <tr><td colspan="5" class="p-8 text-center text-muted-foreground">No forecasts match the current search and filters.</td></tr>}
+									</tbody>
+								</table>
+					</div>
+					<TablePagination url={Astro.url} total={total} page={page} pageSize={request.limit} />
+				</section>
+			)}
+		</div>
+	</main>
+</Layout>

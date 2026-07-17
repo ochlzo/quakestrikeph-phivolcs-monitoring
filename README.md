@@ -93,6 +93,7 @@ The portal migrations are:
 ```text
 supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql
 supabase/migrations/20260717090000_add_operator_profiles.sql
+supabase/migrations/20260717150000_add_portal_table_pagination.sql
 ```
 
 It creates:
@@ -100,6 +101,7 @@ It creates:
 - `forecast_reviews`, unique per event and forecast generation time
 - `audit_logs`, for server-side operator mutation records
 - `operator_profiles`, containing verified email and editable display name only
+- server-only paginated search/filter functions for forecasts, raw events, and audit logs
 
 Both tables have RLS enabled and intentionally have no browser policies.
 

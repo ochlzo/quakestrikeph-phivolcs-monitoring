@@ -17,6 +17,9 @@ pnpm-debug.log*
 .env
 .env.production
 
+# Supabase CLI link metadata
+supabase/.temp/
+
 # macOS-specific files
 .DS_Store
 

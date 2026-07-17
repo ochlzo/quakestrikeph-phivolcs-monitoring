@@ -48,6 +48,33 @@ export type ForecastCase = {
 	review: ReviewRow | null;
 };
 
+export type ForecastListRow = {
+	event_id: string;
+	event_date_time: string;
+	latitude: number;
+	longitude: number;
+	depth: number | string;
+	magnitude: number;
+	location: string | null;
+	event_time: string | null;
+	created_at: string;
+	aftershock_24h: number | null;
+	review_status: ReviewStatus;
+};
+
+export type AuditLogRow = {
+	id: number;
+	user_email: string;
+	operator_display_name: string | null;
+	path: string;
+	method: string;
+	created_at: string;
+	metadata: Record<string, unknown>;
+	action: string;
+};
+
+export type PortalPage<T> = { rows: T[]; total: number };
+
 export type EarthquakeMarker = {
 	id: string;
 	date: string;
@@ -110,42 +137,43 @@ function revisionKey(eventId: string, createdAt: string) {
 	return `${eventId}:${new Date(createdAt).toISOString()}`;
 }
 
-export async function getForecastQueue(limit = 40): Promise<ForecastCase[]> {
-	const supabase = getSupabaseAdmin();
-	const predictionsResult = await supabase
-		.from('SeisPredictions_v1')
-		.select(PREDICTION_FIELDS)
-		.order('created_at', { ascending: false })
-		.limit(limit);
-	const predictions = requireData(
-		predictionsResult.data as PredictionRow[] | null,
-		predictionsResult.error,
-		'Could not load forecasts',
-	);
-	if (!predictions.length) return [];
+function portalPage<T>(data: unknown, error: { message: string } | null, action: string): PortalPage<T> {
+	const payload = requireData(data as { rows?: T[]; total?: number } | null, error, action);
+	return {
+		rows: Array.isArray(payload.rows) ? payload.rows : [],
+		total: Number.isFinite(Number(payload.total)) ? Number(payload.total) : 0,
+	};
+}
 
-	const eventIds = predictions.map(({ event_id }) => event_id);
-	const [eventsResult, reviewsResult] = await Promise.all([
-		supabase.from('RawEarthquakeEvents').select(EVENT_FIELDS).in('id', eventIds),
-		supabase.from('forecast_reviews').select(REVIEW_FIELDS).in('event_id', eventIds),
-	]);
-	const events = requireData(eventsResult.data as EventRow[] | null, eventsResult.error, 'Could not load events');
-	const reviews = requireData(reviewsResult.data as ReviewRow[] | null, reviewsResult.error, 'Could not load reviews');
-	const eventById = new Map(events.map((event) => [event.id, event]));
-	const reviewByRevision = new Map(reviews.map((review) => [
-		revisionKey(review.event_id, review.forecast_created_at),
-		review,
-	]));
-
-	return predictions.flatMap((forecast) => {
-		const event = eventById.get(forecast.event_id);
-		if (!event) return [];
-		return [{
-			event,
-			forecast,
-			review: reviewByRevision.get(revisionKey(forecast.event_id, forecast.created_at)) ?? null,
-		}];
+export async function getForecastPage(options: {
+	query?: string | null;
+	reviewStatuses?: ReviewStatus[] | null;
+	magnitudeRanges?: MagnitudeRange[] | null;
+	depthFrom?: number | null;
+	depthTo?: number | null;
+	dateFrom?: string | null;
+	dateTo?: string | null;
+	aftershockLikelihoods?: string[] | null;
+	m5Likelihoods?: string[] | null;
+	minimumStrongest?: number | null;
+	limit: number;
+	offset: number;
+}): Promise<PortalPage<ForecastListRow>> {
+	const result = await getSupabaseAdmin().rpc('get_portal_forecast_page', {
+		query_text: options.query?.trim() || null,
+		review_statuses: options.reviewStatuses?.length ? options.reviewStatuses : null,
+		magnitude_ranges: options.magnitudeRanges?.length ? options.magnitudeRanges : null,
+		depth_from: options.depthFrom ?? null,
+		depth_to: options.depthTo ?? null,
+		date_from: options.dateFrom ?? null,
+		date_to: options.dateTo ?? null,
+		aftershock_24h_likelihoods: options.aftershockLikelihoods?.length ? options.aftershockLikelihoods : null,
+		m5_plus_likelihoods: options.m5Likelihoods?.length ? options.m5Likelihoods : null,
+		minimum_estimated_strongest_aftershock: options.minimumStrongest ?? null,
+		result_limit: options.limit,
+		result_offset: options.offset,
 	});
+	return portalPage<ForecastListRow>(result.data, result.error, 'Could not load forecasts');
 }
 
 export async function getForecastCase(eventId: string): Promise<ForecastCase | null> {
@@ -261,16 +289,64 @@ export async function getForecastPlaybackPage(eventId: string, cursor: PlaybackC
 	};
 }
 
-export async function getRawEvents(limit = MAP_PAGE_SIZE) {
-	const safeLimit = Math.max(1, Math.min(Math.trunc(limit), MAX_MAP_EVENTS));
-	const result = await getSupabaseAdmin().from('RawEarthquakeEvents').select(EVENT_FIELDS, { count: 'exact' }).order('event_time', { ascending: false }).range(0, safeLimit - 1);
-	return { events: requireData(result.data as EventRow[] | null, result.error, 'Could not load raw events'), total: result.count ?? 0 };
+export async function getRawEventPage(options: {
+	query?: string | null;
+	magnitudeRanges?: MagnitudeRange[] | null;
+	depthFrom?: number | null;
+	depthTo?: number | null;
+	dateFrom?: string | null;
+	dateTo?: string | null;
+	limit: number;
+	offset: number;
+}): Promise<PortalPage<EventRow>> {
+	const result = await getSupabaseAdmin().rpc('get_portal_event_page', {
+		query_text: options.query?.trim() || null,
+		magnitude_ranges: options.magnitudeRanges?.length ? options.magnitudeRanges : null,
+		depth_from: options.depthFrom ?? null,
+		depth_to: options.depthTo ?? null,
+		date_from: options.dateFrom ?? null,
+		date_to: options.dateTo ?? null,
+		result_limit: options.limit,
+		result_offset: options.offset,
+	});
+	const page = portalPage<{
+		id: string; date_time: string; latitude: number; longitude: number; depth: number | string;
+		magnitude: number; location: string | null; event_time: string | null;
+	}>(result.data, result.error, 'Could not load raw events');
+	return {
+		total: page.total,
+		rows: page.rows.map((row) => ({
+			id: row.id,
+			'Date-Time': row.date_time,
+			Latitude: row.latitude,
+			Longitude: row.longitude,
+			Depth: row.depth,
+			Magnitude: row.magnitude,
+			Location: row.location,
+			event_time: row.event_time,
+		})),
+	};
 }
 
-export async function getAuditLogs(limit = MAP_PAGE_SIZE) {
-	const safeLimit = Math.max(1, Math.min(Math.trunc(limit), MAX_MAP_EVENTS));
-	const result = await getSupabaseAdmin().from('audit_logs').select('id, user_email, path, method, created_at, metadata', { count: 'exact' }).order('created_at', { ascending: false }).range(0, safeLimit - 1);
-	return { logs: requireData(result.data as Array<{ id: number; user_email: string; path: string; method: string; created_at: string; metadata: Record<string, unknown> }> | null, result.error, 'Could not load audit logs'), total: result.count ?? 0 };
+export async function getAuditLogPage(options: {
+	query?: string | null;
+	actions?: string[] | null;
+	dateFrom?: string | null;
+	dateTo?: string | null;
+	limit: number;
+	offset: number;
+}): Promise<PortalPage<AuditLogRow> & { actions: string[] }> {
+	const result = await getSupabaseAdmin().rpc('get_portal_audit_log_page', {
+		query_text: options.query?.trim() || null,
+		actions: options.actions?.length ? options.actions : null,
+		date_from: options.dateFrom ?? null,
+		date_to: options.dateTo ?? null,
+		result_limit: options.limit,
+		result_offset: options.offset,
+	});
+	const page = portalPage<AuditLogRow>(result.data, result.error, 'Could not load audit logs');
+	const actions = (result.data as { actions?: unknown } | null)?.actions;
+	return { ...page, actions: Array.isArray(actions) ? actions.filter((action): action is string => typeof action === 'string') : [] };
 }
 
 export async function getOperatorProfile(email: string): Promise<OperatorProfile | null> {

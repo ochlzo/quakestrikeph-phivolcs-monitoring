@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -75,30 +76,33 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
             align="end"
             sideOffset={8}
           >
-            <DropdownMenuLabel className="flex items-center gap-2 px-0 pb-2">
-              <UserRoundIcon className="size-4 text-primary" />
-              PHIVOLCS operator profile
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <form className="space-y-3 pt-2" onSubmit={save}>
-              <div className="space-y-1.5">
-                <Label htmlFor="operator-email">Verified email</Label>
-                <Input id="operator-email" value={user.email} disabled />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="operator-display-name">Display name</Label>
-                <Input
-                  id="operator-display-name"
-                  name="display_name"
-                  value={draft}
-                  maxLength={100}
-                  required
-                  onChange={(event) => setDraft(event.target.value)}
-                />
-              </div>
-              {status ? <p role="status" className="text-xs text-muted-foreground">{status}</p> : null}
-              <Button className="w-full" disabled={saving}>{saving ? "Saving…" : "Save profile"}</Button>
-            </form>
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="flex items-center gap-2 px-0 pb-2">
+                <UserRoundIcon className="size-4 text-primary" />
+                PHIVOLCS operator profile
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <form className="space-y-3 pt-2" onSubmit={save}>
+                <div className="space-y-1.5">
+                  <Label htmlFor="operator-email">Verified email</Label>
+                  <Input id="operator-email" value={user.email} disabled />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="operator-display-name">Display name</Label>
+                  <Input
+                    id="operator-display-name"
+                    name="display_name"
+                    value={draft}
+                    maxLength={100}
+                    required
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                  />
+                </div>
+                {status ? <p role="status" className="text-xs text-muted-foreground">{status}</p> : null}
+                <Button className="w-full" disabled={saving}>{saving ? "Saving…" : "Save profile"}</Button>
+              </form>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
