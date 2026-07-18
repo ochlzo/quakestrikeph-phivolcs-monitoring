@@ -1,9 +1,9 @@
-import * as React from 'react';
-import { XIcon } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { ReviewForm } from '@/components/review-form';
-import type { EarthquakeMarker, ForecastCase } from '@/lib/portal-data';
-import type { ReviewStatus } from '@/lib/reviews';
+import * as React from "react";
+import { XIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ReviewForm } from "@/components/review-form";
+import type { EarthquakeMarker, ForecastCase } from "@/lib/portal-data";
+import type { ReviewStatus } from "@/lib/reviews";
 
 export function ReviewDialog({
   event,
@@ -15,11 +15,11 @@ export function ReviewDialog({
   onSaved: (eventId: string, status: ReviewStatus) => void;
 }) {
   const [item, setItem] = React.useState<ForecastCase | null>(null);
-  const [error, setError] = React.useState('');
+  const [error, setError] = React.useState("");
   React.useEffect(() => {
     if (!event) {
       setItem(null);
-      setError('');
+      setError("");
       return;
     }
     const controller = new AbortController();
@@ -33,17 +33,18 @@ export function ReviewDialog({
       })
       .then(setItem)
       .catch((reason) => {
-        if (reason.name !== 'AbortError') setError(reason.message || 'Could not load review.');
+        if (reason.name !== "AbortError")
+          setError(reason.message || "Could not load review.");
       });
     return () => controller.abort();
   }, [event?.id]);
   React.useEffect(() => {
     if (!event) return;
     function closeOnEscape(keyEvent: KeyboardEvent) {
-      if (keyEvent.key === 'Escape') onOpenChange(false);
+      if (keyEvent.key === "Escape") onOpenChange(false);
     }
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
   }, [event, onOpenChange]);
 
   if (!event) return null;
@@ -80,7 +81,7 @@ export function ReviewDialog({
         <div className="grid h-[90svh] min-h-0 lg:grid-cols-[minmax(0,2fr)_minmax(340px,1fr)]">
           <iframe
             title={`Forecast discussion for ${event.location ?? event.id}`}
-            src={`https://quakestrikeph.qzz.io/forecast?event=${encodeURIComponent(event.id)}`}
+            src={`https://quakestrikeph.qzz.io/forecast?event=${encodeURIComponent(event.id)}&iframe=true`}
             className="h-full min-h-[45svh] w-full border-0 bg-background"
           />
           <div className="min-h-0 border-t bg-card lg:border-l lg:border-t-0">
@@ -89,7 +90,10 @@ export function ReviewDialog({
                 {error}
               </div>
             ) : item ? (
-              <ReviewForm item={item} onSaved={(status) => onSaved(item.event.id, status)} />
+              <ReviewForm
+                item={item}
+                onSaved={(status) => onSaved(item.event.id, status)}
+              />
             ) : (
               <div className="p-6 text-muted-foreground">Loading review…</div>
             )}

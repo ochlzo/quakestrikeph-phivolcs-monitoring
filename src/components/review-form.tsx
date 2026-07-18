@@ -115,7 +115,7 @@ export function ReviewForm({
         ) : null}
       </div>
       <div className="border-t p-4">
-        <Button className="w-full" disabled={saving}>
+        <Button type="submit" className="w-full" disabled={saving}>
           {saving ? 'Saving review…' : 'Save review'}
         </Button>
       </div>

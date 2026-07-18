@@ -106,7 +106,7 @@ export function NavUser({ user }: { user: { name: string; email: string } }) {
                     {status}
                   </p>
                 ) : null}
-                <Button className="w-full" disabled={saving}>
+                <Button type="submit" className="w-full" disabled={saving}>
                   {saving ? 'Saving…' : 'Save profile'}
                 </Button>
               </form>

@@ -37,7 +37,7 @@ export type ReviewRow = {
   status: ReviewStatus;
   review_text: string;
   internal_note: string;
-  reviewer_email: string;
+  operator_id: number;
   reviewed_at: string | null;
   updated_at: string;
 };
@@ -125,6 +125,7 @@ export type PlaybackPage = {
 };
 
 export type OperatorProfile = {
+  id: number;
   email: string;
   display_name: string;
   created_at: string;
@@ -140,7 +141,7 @@ const PREDICTION_FIELDS = `
 const EVENT_FIELDS =
   'id, "Date-Time", "Latitude", "Longitude", "Depth", "Magnitude", "Location", event_time';
 const REVIEW_FIELDS =
-  'id, event_id, forecast_created_at, status, review_text, internal_note, reviewer_email, reviewed_at, updated_at';
+  'id, event_id, forecast_created_at, status, review_text, internal_note, operator_id, reviewed_at, updated_at';
 export const MAP_PAGE_SIZE = 50;
 export const MAX_MAP_EVENTS = 2000;
 
@@ -480,7 +481,7 @@ export async function getAuditLogPage(options: {
 export async function getOperatorProfile(email: string): Promise<OperatorProfile | null> {
   const result = await getSupabaseAdmin()
     .from('operator_profiles')
-    .select('email, display_name, created_at, updated_at')
+    .select('id, email, display_name, created_at, updated_at')
     .eq('email', email)
     .maybeSingle();
   if (result.error?.code === 'PGRST205') return null;
@@ -498,7 +499,7 @@ export async function saveOperatorProfile(
   const result = await supabase
     .from('operator_profiles')
     .upsert({ email, display_name: displayName, updated_at: now }, { onConflict: 'email' })
-    .select('email, display_name, created_at, updated_at')
+    .select('id, email, display_name, created_at, updated_at')
     .single();
   const profile = requireData(
     result.data as OperatorProfile | null,
@@ -539,6 +540,22 @@ export async function saveForecastReview(
     throw new Error('This forecast was superseded. Reload and review the current forecast.');
   }
 
+  const profileInsert = await supabase
+    .from('operator_profiles')
+    .upsert({ email: operatorEmail }, { onConflict: 'email', ignoreDuplicates: true });
+  if (profileInsert.error)
+    throw new Error(`Could not ensure operator profile: ${profileInsert.error.message}`);
+  const profileResult = await supabase
+    .from('operator_profiles')
+    .select('id')
+    .eq('email', operatorEmail)
+    .single();
+  const operator = requireData(
+    profileResult.data as { id: number } | null,
+    profileResult.error,
+    'Could not load operator profile',
+  );
+
   const now = new Date().toISOString();
   const result = await supabase.from('forecast_reviews').upsert(
     {
@@ -547,7 +564,7 @@ export async function saveForecastReview(
       status: input.status,
       review_text: input.reviewText,
       internal_note: input.internalNote,
-      reviewer_email: operatorEmail,
+      operator_id: operator.id,
       reviewed_at: input.status.startsWith('REVIEWED_') ? now : null,
       updated_at: now,
     },

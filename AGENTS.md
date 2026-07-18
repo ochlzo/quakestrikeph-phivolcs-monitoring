@@ -159,10 +159,12 @@ For OTP policies, allow explicit operator email addresses. Do not use `Include -
 - Source tables already expected in Supabase: `RawEarthquakeEvents` and `SeisPredictions_v1`.
 - Portal migration: `supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql`.
 - Operator profile migration: `supabase/migrations/20260717090000_add_operator_profiles.sql`.
+- Review/operator relation migration: `supabase/migrations/20260717152242_link_forecast_reviews_to_operator_profiles.sql`.
 - `forecast_reviews` is unique on `(event_id, forecast_created_at)`, preserving a separate review per forecast revision.
+- `forecast_reviews.operator_id` is a required foreign key to `operator_profiles.id`; the review table does not duplicate the operator email.
 - `audit_logs` records the authenticated email, path, method, timestamp, and mutation metadata.
 - All portal-owned tables have RLS enabled with no browser policies. Access is intentionally through server-side Supabase credentials only.
-- `operator_profiles` stores only verified email, display name, and timestamps; profile mutations derive email from the Access JWT and write an audit row.
+- `operator_profiles` uses a generated numeric ID, keeps verified email unique, and stores display name and timestamps; profile mutations derive email from the Access JWT and write an audit row.
 - Review and query logic belongs in `src/lib/portal-data.ts`, not in UI components.
 
 Do not assume that the migration file has been applied to the linked remote project. Check migration history or the live schema before debugging review persistence.
