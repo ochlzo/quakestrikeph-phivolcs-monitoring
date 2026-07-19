@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ALERT_STATUSES,
+  ALERT_STATUS_LABELS,
   canAttemptAlert,
   composeReviewedForecastEmail,
   pendingAlertLog,
@@ -29,6 +31,10 @@ const forecast = {
   distance_msg: "The most likely zone is within 10 km.",
   max_magnitude_msg: "Estimated maximum magnitude is M4.2.",
 } as PredictionRow;
+
+test("defines a label for every alert status", () => {
+  assert.deepEqual(Object.keys(ALERT_STATUS_LABELS), [...ALERT_STATUSES]);
+});
 
 test("allows new and failed alerts to be attempted", () => {
   assert.equal(canAttemptAlert("NOT_SENT"), true);

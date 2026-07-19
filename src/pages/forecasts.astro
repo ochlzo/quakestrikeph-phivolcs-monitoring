@@ -5,6 +5,7 @@ import TablePagination from '@/components/table-pagination.astro';
 import TableToolbar from '@/components/table-toolbar.astro';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { ALERT_STATUS_LABELS, type AlertStatus } from '@/lib/alerts';
 import { getForecastPage, type ForecastListRow } from '@/lib/portal-data';
 import { FORECAST_LIKELIHOODS } from '@/lib/earthquake-map-filters';
 import { MAGNITUDE_RANGE_OPTIONS, magnitudeSelectionsToRanges } from '@/lib/magnitude-ranges';
@@ -88,6 +89,12 @@ const PHT = new Intl.DateTimeFormat('en-PH', {
 });
 const fieldClass =
   'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
+const alertStatusClass: Record<AlertStatus, string> = {
+  NOT_SENT: 'bg-muted text-muted-foreground',
+  SENDING: 'bg-secondary text-secondary-foreground',
+  SENT: 'border-primary/20 bg-accent text-primary',
+  FAILED: 'border-destructive/20 bg-destructive/10 text-destructive',
+};
 ---
 
 <Layout title="Forecast list">
@@ -97,7 +104,7 @@ const fieldClass =
         <p class="text-xs font-semibold uppercase tracking-wide text-primary">Review queue</p>
         <h1 class="text-2xl font-semibold">Forecast list</h1>
         <p class="text-sm text-muted-foreground">
-          Current model revisions and their PHIVOLCS review status.
+          Current model revisions and their PHIVOLCS review and alert-delivery status.
         </p>
       </header>
       {
@@ -265,7 +272,8 @@ const fieldClass =
                       <th class="p-3">Event</th>
                       <th class="p-3">Forecast generated</th>
                       <th class="p-3">24-hour chance</th>
-                      <th class="p-3">Status</th>
+                      <th class="p-3">Review status</th>
+                      <th class="p-3">Alert delivery</th>
                       <th class="p-3" />
                     </>
                   </tr>
@@ -295,6 +303,11 @@ const fieldClass =
                             {REVIEW_STATUS_LABELS[item.review_status]}
                           </Badge>
                         </td>
+                        <td class="p-3">
+                          <Badge className={alertStatusClass[item.alert_status]}>
+                            {ALERT_STATUS_LABELS[item.alert_status]}
+                          </Badge>
+                        </td>
                         <td class="p-3 text-right">
                           <a
                             class={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -307,7 +320,7 @@ const fieldClass =
                     ))
                   ) : (
                     <tr>
-                      <td colspan="5" class="p-8 text-center text-muted-foreground">
+                      <td colspan="6" class="p-8 text-center text-muted-foreground">
                         No forecasts match the current search and filters.
                       </td>
                     </tr>

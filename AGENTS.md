@@ -171,6 +171,7 @@ For OTP policies, allow explicit operator email addresses. Do not use `Include -
 - Alert preference migrations: `supabase/migrations/20260718184629_rename_favorites_to_saved_pins.sql` and `supabase/migrations/20260718195846_add_pubuser_alert_preferences.sql`.
 - Automatic-system alert log migration: `supabase/migrations/20260719120000_add_alert_logs.sql`.
 - Reviewed-alert delivery migrations: `supabase/migrations/20260718212718_add_forecast_alert_delivery.sql` and `supabase/migrations/20260718212744_add_forecast_alert_sender_index.sql`.
+- Forecast-list alert-status migration: `supabase/migrations/20260719132214_add_alert_status_to_forecast_page.sql`.
 - `forecast_reviews` is unique on `(event_id, forecast_created_at)`, preserving a separate review per forecast revision.
 - `forecast_reviews.operator_id` is a required foreign key to `operator_profiles.id`; the review table does not duplicate the operator email.
 - `forecast_reviews.alert_status` remains separate from review `status`; its private `alert_log` preserves the recipient/message snapshot and Brevo outcome.

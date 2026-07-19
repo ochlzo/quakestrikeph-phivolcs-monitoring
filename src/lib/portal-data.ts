@@ -63,6 +63,7 @@ export type ForecastListRow = {
   created_at: string;
   aftershock_24h: number | null;
   review_status: ReviewStatus;
+  alert_status: AlertStatus;
 };
 
 export type AuditLogRow = {

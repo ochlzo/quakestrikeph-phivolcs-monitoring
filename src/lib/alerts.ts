@@ -8,6 +8,13 @@ export const ALERT_STATUSES = [
 ] as const;
 export type AlertStatus = (typeof ALERT_STATUSES)[number];
 
+export const ALERT_STATUS_LABELS: Record<AlertStatus, string> = {
+  NOT_SENT: "Not sent",
+  SENDING: "Sending",
+  SENT: "Sent",
+  FAILED: "Failed",
+};
+
 export type AlertRecipient = {
   email: string;
   puser_ids: number[];

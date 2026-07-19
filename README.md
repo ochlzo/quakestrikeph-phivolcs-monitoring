@@ -105,6 +105,7 @@ supabase/migrations/20260718195846_add_pubuser_alert_preferences.sql
 supabase/migrations/20260719120000_add_alert_logs.sql
 supabase/migrations/20260718212718_add_forecast_alert_delivery.sql
 supabase/migrations/20260718212744_add_forecast_alert_sender_index.sql
+supabase/migrations/20260719132214_add_alert_status_to_forecast_page.sql
 ```
 
 It creates:
