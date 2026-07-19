@@ -7,7 +7,7 @@ User -> Cloudflare Access -> Cloudflare Tunnel -> cloudflared container
      -> app:4321 on the Docker network -> Supabase
 ```
 
-The current implementation provides the map monitor, explicit event pagination, forecast-details sidebar, forecast discussion/playback, review dialog and full-page review workflow, audit/raw-event lists, and a minimal operator display profile. `REVIEWED_FOR_ALERT` records review intent only; alert composition and delivery are not implemented.
+The current implementation provides the map monitor, explicit event pagination, forecast-details sidebar, forecast discussion/playback, review dialog and full-page review workflow, audit/raw-event lists, a minimal operator display profile, and human-initiated Brevo email alerts. `REVIEWED_FOR_ALERT` records review intent; an operator must separately confirm `Send alert` before delivery.
 
 ## Prerequisites
 
@@ -35,6 +35,11 @@ Copy `.env.example` to `.env` and replace every placeholder. `.env` is ignored b
 | `SUPABASE_URL`              | Yes            | Supabase project URL used by server-side code.                                                                                         |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes            | Server secret (`sb_secret_...` or legacy service-role key). An `sb_publishable_...` key will be rejected.                              |
 | `GOOGLE_MAPS_API_KEY`       | No             | Server-only Google tile key. The map falls back to OpenStreetMap when omitted or unavailable.                                          |
+| `EMAIL_ALERTS_ENABLED`      | Compose        | Set to `true` to allow human-initiated reviewed forecast email alerts.                                                                 |
+| `BREVO_API_KEY`             | Compose        | Server-only Brevo API key. Never expose or log it.                                                                                     |
+| `BREVO_SENDER_EMAIL`        | Compose        | Verified Brevo sender email, currently `alerts@quakestrikeph.qzz.io`.                                                                  |
+| `BREVO_SENDER_NAME`         | Compose        | Sender display name, currently `QuakeStrike PH`.                                                                                       |
+| `PIN_ALERT_MIN_MMI`         | Compose        | Minimum calculated MMI for recipients who enabled near-pins-only alerts; currently `3.0`.                                              |
 | `DEV_AUTH_EMAIL`            | Local dev only | Development identity for `pnpm dev`. Production Compose ignores it.                                                                    |
 
 Never commit `.env`, log the tunnel token or Supabase secret, or expose the Supabase secret through a public Astro environment variable.
@@ -95,13 +100,19 @@ supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql
 supabase/migrations/20260717090000_add_operator_profiles.sql
 supabase/migrations/20260717150000_add_portal_table_pagination.sql
 supabase/migrations/20260717152242_link_forecast_reviews_to_operator_profiles.sql
+supabase/migrations/20260718184629_rename_favorites_to_saved_pins.sql
+supabase/migrations/20260718195846_add_pubuser_alert_preferences.sql
+supabase/migrations/20260719120000_add_alert_logs.sql
+supabase/migrations/20260718212718_add_forecast_alert_delivery.sql
+supabase/migrations/20260718212744_add_forecast_alert_sender_index.sql
 ```
 
 It creates:
 
-- `forecast_reviews`, unique per event and forecast generation time, linked to its operator profile by `operator_id`
+- `forecast_reviews`, unique per event and forecast generation time, linked to its operator profile by `operator_id`, with separate alert delivery state and a private delivery snapshot
 - `audit_logs`, for server-side operator mutation records
 - `operator_profiles`, keyed by `id` with a unique verified email and editable display name
+- `PubUser` alert preferences, `SavedPins`, and private automatic-system `AlertLogs`
 - server-only paginated search/filter functions for forecasts, raw events, and audit logs
 
 All three portal-owned tables have RLS enabled and intentionally have no browser policies.
@@ -193,6 +204,9 @@ docker compose down
 - Non-read requests whose `Origin` differs from `PORTAL_ORIGIN` return `403 Forbidden`.
 - The app never trusts `Cf-Access-Authenticated-User-Email` by itself.
 - The Supabase secret is used only by SSR code, and the runtime container runs as a non-root user.
+- The Brevo API key and recipient snapshots remain server-only.
+- Alert delivery requires a current `REVIEWED_FOR_ALERT` review, an authenticated operator, and a separate confirmation click.
+- A sent review rejects changes to every review field except its internal note.
 
 Cloudflare Access is one security layer, not a replacement for application validation, MFA, host patching, secret rotation, audit review, and network restrictions.
 
@@ -249,6 +263,8 @@ docker compose --env-file .env config --quiet
 
 Review dialogs always embed `https://quakestrikeph.qzz.io/forecast?event=<event-id>`.
 
+Reviewed email alerts include every `PubUser` with `alerts_on=true`. Users with `phivolcs_only=true` receive only this reviewed path; users with `phivolcs_only=false` can also receive the separate automatic backend forecast alert. When `near_pins_only=true`, at least one saved pin must have calculated MMI greater than or equal to `PIN_ALERT_MIN_MMI`.
+
 ## Deferred scope
 
-The Alerts navigation item is intentionally disabled. Do not add alert recipients, delivery channels, providers, retries, corrections, or send behavior until those contracts are separately approved.
+The dedicated alert composer, audience overrides, delivery channels beyond email, automated retries, follow-up corrections, and alert-history screens remain deferred. Sent delivery snapshots are retained; corrections must be implemented as new linked alerts rather than edits.

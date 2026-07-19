@@ -1,4 +1,5 @@
 import type { ReviewInput, ReviewStatus } from './reviews';
+import type { AlertStatus } from './alerts';
 import { getSupabaseAdmin } from './supabase-server';
 
 export type EventRow = {
@@ -40,6 +41,8 @@ export type ReviewRow = {
   operator_id: number;
   reviewed_at: string | null;
   updated_at: string;
+  alert_status: AlertStatus;
+  alert_sent_at: string | null;
 };
 
 export type ForecastCase = {
@@ -141,7 +144,7 @@ const PREDICTION_FIELDS = `
 const EVENT_FIELDS =
   'id, "Date-Time", "Latitude", "Longitude", "Depth", "Magnitude", "Location", event_time';
 const REVIEW_FIELDS =
-  'id, event_id, forecast_created_at, status, review_text, internal_note, operator_id, reviewed_at, updated_at';
+  'id, event_id, forecast_created_at, status, review_text, internal_note, operator_id, reviewed_at, updated_at, alert_status, alert_sent_at';
 export const MAP_PAGE_SIZE = 50;
 export const MAX_MAP_EVENTS = 2000;
 
@@ -518,6 +521,25 @@ export async function saveOperatorProfile(
   return profile;
 }
 
+export async function ensureOperatorId(email: string) {
+  const supabase = getSupabaseAdmin();
+  const profileInsert = await supabase
+    .from('operator_profiles')
+    .upsert({ email }, { onConflict: 'email', ignoreDuplicates: true });
+  if (profileInsert.error)
+    throw new Error(`Could not ensure operator profile: ${profileInsert.error.message}`);
+  const profileResult = await supabase
+    .from('operator_profiles')
+    .select('id')
+    .eq('email', email)
+    .single();
+  return requireData(
+    profileResult.data as { id: number } | null,
+    profileResult.error,
+    'Could not load operator profile',
+  ).id;
+}
+
 export async function saveForecastReview(
   eventId: string,
   forecastCreatedAt: string,
@@ -540,48 +562,65 @@ export async function saveForecastReview(
     throw new Error('This forecast was superseded. Reload and review the current forecast.');
   }
 
-  const profileInsert = await supabase
-    .from('operator_profiles')
-    .upsert({ email: operatorEmail }, { onConflict: 'email', ignoreDuplicates: true });
-  if (profileInsert.error)
-    throw new Error(`Could not ensure operator profile: ${profileInsert.error.message}`);
-  const profileResult = await supabase
-    .from('operator_profiles')
-    .select('id')
-    .eq('email', operatorEmail)
-    .single();
-  const operator = requireData(
-    profileResult.data as { id: number } | null,
-    profileResult.error,
-    'Could not load operator profile',
-  );
-
   const now = new Date().toISOString();
-  const result = await supabase.from('forecast_reviews').upsert(
-    {
-      event_id: eventId,
-      forecast_created_at: forecastCreatedAt,
-      status: input.status,
-      review_text: input.reviewText,
-      internal_note: input.internalNote,
-      operator_id: operator.id,
-      reviewed_at: input.status.startsWith('REVIEWED_') ? now : null,
-      updated_at: now,
-    },
-    { onConflict: 'event_id,forecast_created_at' },
-  );
-  if (result.error) throw new Error(`Could not save review: ${result.error.message}`);
+  const existingResult = await supabase
+    .from('forecast_reviews')
+    .select(REVIEW_FIELDS)
+    .eq('event_id', eventId)
+    .eq('forecast_created_at', forecastCreatedAt)
+    .maybeSingle();
+  if (existingResult.error)
+    throw new Error(`Could not load review state: ${existingResult.error.message}`);
+
+  let review: ReviewRow;
+  let action = 'save_forecast_review';
+  if ((existingResult.data as ReviewRow | null)?.alert_status === 'SENT') {
+    const result = await supabase
+      .from('forecast_reviews')
+      .update({ internal_note: input.internalNote, updated_at: now })
+      .eq('id', (existingResult.data as ReviewRow).id)
+      .eq('alert_status', 'SENT')
+      .select(REVIEW_FIELDS)
+      .single();
+    review = requireData(
+      result.data as ReviewRow | null,
+      result.error,
+      'Could not save internal note',
+    );
+    action = 'update_sent_review_internal_note';
+  } else {
+    const operatorId = await ensureOperatorId(operatorEmail);
+    const result = await supabase
+      .from('forecast_reviews')
+      .upsert(
+        {
+          event_id: eventId,
+          forecast_created_at: forecastCreatedAt,
+          status: input.status,
+          review_text: input.reviewText,
+          internal_note: input.internalNote,
+          operator_id: operatorId,
+          reviewed_at: input.status.startsWith('REVIEWED_') ? now : null,
+          updated_at: now,
+        },
+        { onConflict: 'event_id,forecast_created_at' },
+      )
+      .select(REVIEW_FIELDS)
+      .single();
+    review = requireData(result.data as ReviewRow | null, result.error, 'Could not save review');
+  }
 
   const auditResult = await supabase.from('audit_logs').insert({
     user_email: operatorEmail,
     path,
     method: 'POST',
     metadata: {
-      action: 'save_forecast_review',
+      action,
       event_id: eventId,
       forecast_created_at: forecastCreatedAt,
-      status: input.status,
+      status: review.status,
     },
   });
   if (auditResult.error) console.error('Could not write audit log:', auditResult.error.message);
+  return review;
 }

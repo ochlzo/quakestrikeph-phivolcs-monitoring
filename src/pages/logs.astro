@@ -64,6 +64,14 @@ const fieldClass =
   'h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 const actionLabel = (action: string) =>
   action.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+const textMetadata = (log: AuditLogRow, key: string) => {
+  const value = log.metadata[key];
+  return typeof value === 'string' ? value : null;
+};
+const numberMetadata = (log: AuditLogRow, key: string) => {
+  const value = log.metadata[key];
+  return typeof value === 'number' ? value : null;
+};
 ---
 
 <Layout title="Audit logs">
@@ -158,6 +166,7 @@ const actionLabel = (action: string) =>
                       <th class="p-3">Time</th>
                       <th class="p-3">Operator</th>
                       <th class="p-3">Action</th>
+                      <th class="p-3">Details</th>
                       <th class="p-3">Route</th>
                     </>
                   </tr>
@@ -178,12 +187,37 @@ const actionLabel = (action: string) =>
                           )}
                         </td>
                         <td class="p-3 font-medium">{actionLabel(log.action)}</td>
+                        <td class="p-3 text-xs text-muted-foreground">
+                          {textMetadata(log, 'event_id') ? (
+                            <a
+                              class="font-mono text-primary hover:underline"
+                              href={`/reviews/${encodeURIComponent(textMetadata(log, 'event_id')!)}`}
+                            >
+                              {textMetadata(log, 'event_id')}
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+                          {numberMetadata(log, 'recipient_count') !== null && (
+                            <span class="block">
+                              {numberMetadata(log, 'recipient_count')} recipient(s)
+                            </span>
+                          )}
+                          {textMetadata(log, 'error') && (
+                            <span
+                              class="block max-w-80 truncate text-destructive"
+                              title={textMetadata(log, 'error')!}
+                            >
+                              {textMetadata(log, 'error')}
+                            </span>
+                          )}
+                        </td>
                         <td class="p-3 font-mono text-xs">{log.path}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colspan="4" class="p-8 text-center text-muted-foreground">
+                      <td colspan="5" class="p-8 text-center text-muted-foreground">
                         No logs match the current search and filters.
                       </td>
                     </tr>

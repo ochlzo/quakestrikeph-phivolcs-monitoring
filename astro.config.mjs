@@ -52,6 +52,34 @@ export default defineConfig({
         access: 'secret',
         optional: true,
       }),
+      EMAIL_ALERTS_ENABLED: envField.boolean({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+        default: false,
+      }),
+      BREVO_API_KEY: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      BREVO_SENDER_EMAIL: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+      }),
+      BREVO_SENDER_NAME: envField.string({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+        default: 'QuakeStrike PH',
+      }),
+      PIN_ALERT_MIN_MMI: envField.number({
+        context: 'server',
+        access: 'secret',
+        optional: true,
+        default: 3,
+      }),
     },
   },
 });

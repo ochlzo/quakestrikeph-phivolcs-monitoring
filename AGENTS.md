@@ -20,6 +20,8 @@ The repository currently contains a working first review slice:
 - a minimal server-managed operator display profile
 - review statuses `PENDING_REVIEW`, `DRAFT`, `REVIEWED_NO_ALERT`, and `REVIEWED_FOR_ALERT`
 - server-side review persistence and audit logging
+- human-initiated Brevo delivery for saved `REVIEWED_FOR_ALERT` reviews
+- separate alert delivery statuses `NOT_SENT`, `SENDING`, `SENT`, and `FAILED`
 - Cloudflare Access JWT validation in Astro middleware
 - Docker Compose services for the Astro app and a remotely managed Cloudflare Tunnel
 
@@ -37,16 +39,20 @@ Implemented now:
 - superseded-revision rejection before saving
 - reviewer attribution from the verified Cloudflare Access JWT
 - audit rows for successful review mutations
+- email recipients from `PubUser` alert preferences, including saved-pin MMI filtering
+- explicit send confirmation, Brevo idempotency, recipient snapshots, and operator delivery logs
+- sent-review locking with internal-note-only updates
 
 Still deferred:
 
 - full source-freshness indicators beyond forecast playback status
-- alert composer, recipients, delivery channels, confirmation, retries, and corrections
+- dedicated alert composer and audience overrides
+- delivery channels beyond email, automated retries, and corrections
 - alert history and delivery-result screens
 - organization IdP integration, independent MFA, and PHIVOLCS CIDR/VPN enforcement
 - UI refinement beyond the functional review workflow
 
-`REVIEWED_FOR_ALERT` is only a review state. It does not send an alert. Do not invent an alert provider, recipient model, or delivery contract to advance this state.
+`REVIEWED_FOR_ALERT` is only a review state. It does not send an alert until the operator separately confirms `Send alert`.
 
 ## Product scope
 
@@ -150,6 +156,8 @@ Sending an alert does not require another PHIVOLCS approver. Keep a final confir
 - The Compose `app` service uses `expose`, not `ports`; keep it unreachable from host ports.
 - The runtime image runs as the non-root `node` user.
 - `SUPABASE_SERVICE_ROLE_KEY` is server-only. Reject `sb_publishable_` keys and never add a browser Supabase client unless a separately reviewed use case requires it.
+- `BREVO_API_KEY`, recipient snapshots, and provider message IDs are server-only. Never expose them through browser code or public table policies.
+- Alert sends must verify the current forecast revision and a saved `REVIEWED_FOR_ALERT` review on the server. Never rely on button visibility as the authorization boundary.
 - `/healthz` intentionally bypasses Astro identity checks for the internal container health check. The public hostname must still be covered by the Access application.
 
 For OTP policies, allow explicit operator email addresses. Do not use `Include -> Everyone`, `Include -> Login Methods -> One-time PIN`, or broad `Bypass` policies. OTP is acceptable for testing; production still requires independent MFA or an organization IdP with MFA plus the approved PHIVOLCS network restriction.
@@ -160,12 +168,17 @@ For OTP policies, allow explicit operator email addresses. Do not use `Include -
 - Portal migration: `supabase/migrations/20260716090000_add_forecast_reviews_and_audit_logs.sql`.
 - Operator profile migration: `supabase/migrations/20260717090000_add_operator_profiles.sql`.
 - Review/operator relation migration: `supabase/migrations/20260717152242_link_forecast_reviews_to_operator_profiles.sql`.
+- Alert preference migrations: `supabase/migrations/20260718184629_rename_favorites_to_saved_pins.sql` and `supabase/migrations/20260718195846_add_pubuser_alert_preferences.sql`.
+- Automatic-system alert log migration: `supabase/migrations/20260719120000_add_alert_logs.sql`.
+- Reviewed-alert delivery migrations: `supabase/migrations/20260718212718_add_forecast_alert_delivery.sql` and `supabase/migrations/20260718212744_add_forecast_alert_sender_index.sql`.
 - `forecast_reviews` is unique on `(event_id, forecast_created_at)`, preserving a separate review per forecast revision.
 - `forecast_reviews.operator_id` is a required foreign key to `operator_profiles.id`; the review table does not duplicate the operator email.
+- `forecast_reviews.alert_status` remains separate from review `status`; its private `alert_log` preserves the recipient/message snapshot and Brevo outcome.
+- `alert_sent_by_operator_id` and `audit_logs` identify who sent or attempted the alert and when.
 - `audit_logs` records the authenticated email, path, method, timestamp, and mutation metadata.
 - All portal-owned tables have RLS enabled with no browser policies. Access is intentionally through server-side Supabase credentials only.
 - `operator_profiles` uses a generated numeric ID, keeps verified email unique, and stores display name and timestamps; profile mutations derive email from the Access JWT and write an audit row.
-- Review and query logic belongs in `src/lib/portal-data.ts`, not in UI components.
+- Review/query logic belongs in `src/lib/portal-data.ts`; alert composition and delivery belong in `src/lib/alerts.ts` and `src/lib/alert-delivery.ts`, not in UI components.
 
 Do not assume that the migration file has been applied to the linked remote project. Check migration history or the live schema before debugging review persistence.
 

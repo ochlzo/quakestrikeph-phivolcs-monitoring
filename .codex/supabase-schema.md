@@ -24,9 +24,13 @@ Context only — not a runnable migration. Live `public` schema for Supabase pro
 - `ProcessingJobs` — `job_id` (PK), `event_id` (FK), `scraper_run_id`
   (nullable FK), `status` (`queued|running|completed|failed`),
   `attempt_count`, `error_message`, `started_at`, `finished_at`, `created_at`.
+- `AlertLogs` — `processing_job_id` (PK/FK), `event_id` (FK), private
+  automatic-system `alert_log` JSONB delivery snapshot, `created_at`, and
+  `updated_at`.
 - `PubUser` — `PUser_id` (PK), `auth_user_id` (unique), `role`
   (`user|admin`), `Email`, `DisplayName`, `FName`, `Mname`, `LName`,
-  `MobileNum`, plus legacy nullable columns `Password` and `Fave_id`.
+  `MobileNum`, `alerts_on`, `phivolcs_only`, `near_pins_only`, plus legacy
+  nullable columns `Password` and `Fave_id`.
   `MobileNum`, when present, must match `09` followed by nine digits.
 - `PubUserAuditLog` — `aud_id` (PK), `profile_puser_id`,
   `profile_auth_user_id`, `profile_email`, `action` (`insert|update`),
@@ -34,7 +38,7 @@ Context only — not a runnable migration. Live `public` schema for Supabase pro
   `changed_by_email`, `changed_at`.
 - `PasswordResetLog` — `log_id` (PK), `auth_user_id` (FK), `reset_email`,
   `status`, `reset_type`, `completed_at`.
-- `Favorites` — `favorite_id` (PK), `auth_user_id` (FK), `favorite_label`,
+- `SavedPins` — `favorite_id` (PK), `auth_user_id` (FK), `favorite_label`,
   `favorite_kind` (`location|city|map_pin`), `latitude`, `longitude`,
   `created_at`. Map pins require both coordinates. A user cannot have duplicate
   case-insensitive `(favorite_label, favorite_kind)` entries.
@@ -45,7 +49,10 @@ Context only — not a runnable migration. Live `public` schema for Supabase pro
   `forecast_created_at`, `status`
   (`PENDING_REVIEW|DRAFT|REVIEWED_NO_ALERT|REVIEWED_FOR_ALERT`),
   `review_text`, `internal_note`, `reviewed_at`, `created_at`, `updated_at`,
-  `operator_id` (FK). `(event_id, forecast_created_at)` is unique.
+  `operator_id` (FK), separate `alert_status`
+  (`NOT_SENT|SENDING|SENT|FAILED`), `alert_id`, private `alert_log`,
+  `alert_sent_at`, and `alert_sent_by_operator_id` (FK).
+  `(event_id, forecast_created_at)` is unique.
 - `audit_logs` — `id` (identity PK), `user_email`, `path`, `method`,
   `created_at`, `metadata`. This is the server-only portal activity log.
 
@@ -57,7 +64,7 @@ ScraperRuns 1 -- * RawEarthquakeEvents 1 -- 1 SeisPredictions_v1
        \                         * -- ProcessingJobs
         * -----------------------/
 
-PubUser 1 -- * Favorites
+PubUser 1 -- * SavedPins
     \    1 -- * PasswordResetLog
 
 operator_profiles 1 -- * forecast_reviews * -- 1 RawEarthquakeEvents
@@ -67,12 +74,16 @@ operator_profiles 1 -- * forecast_reviews * -- 1 RawEarthquakeEvents
 - `SeisPredictions_v1.event_id -> RawEarthquakeEvents.id` (`ON DELETE CASCADE`).
 - `ProcessingJobs.event_id -> RawEarthquakeEvents.id` (`ON DELETE CASCADE`).
 - `ProcessingJobs.scraper_run_id -> ScraperRuns.run_id` (optional).
-- `Favorites.auth_user_id -> PubUser.auth_user_id` (`ON DELETE CASCADE`).
+- `AlertLogs.processing_job_id -> ProcessingJobs.job_id`.
+- `AlertLogs.event_id -> RawEarthquakeEvents.id`.
+- `SavedPins.auth_user_id -> PubUser.auth_user_id` (`ON DELETE CASCADE`).
 - `PasswordResetLog.auth_user_id -> PubUser.auth_user_id`
   (`ON DELETE CASCADE`).
 - `forecast_reviews.event_id -> RawEarthquakeEvents.id`
   (`ON DELETE RESTRICT`).
 - `forecast_reviews.operator_id -> operator_profiles.id`
+  (`ON DELETE RESTRICT`).
+- `forecast_reviews.alert_sent_by_operator_id -> operator_profiles.id`
   (`ON DELETE RESTRICT`).
 
 There is currently no declared foreign key from `PubUser.auth_user_id` to
@@ -154,8 +165,10 @@ RLS is enabled on every public table.
   mutation policy exists.
 - `PubUser`: authenticated users may select, insert, and update only their own
   row. Insert/update also require `Email` to match the JWT email.
-- `Favorites`: authenticated users may select, insert, and delete only their
+- `SavedPins`: authenticated users may select, insert, and delete only their
   own rows. There is no update policy.
+- `AlertLogs`: no browser policies; privileges are revoked from browser and
+  public roles because recipient snapshots contain private contact data.
 - `PubUserAuditLog`: authenticated users may currently select all rows.
 - `PasswordResetLog`: authenticated users may currently select all rows and
   insert a row when `reset_email` matches the JWT email.

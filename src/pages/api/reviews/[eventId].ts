@@ -10,14 +10,22 @@ export const POST: APIRoute = async ({ params, request, locals, url }) => {
     if (typeof revision !== 'string' || !revision)
       throw new Error('Forecast revision is required.');
     const input = parseReviewInput(form);
-    await saveForecastReview(params.eventId, revision, locals.user.email, input, url.pathname);
+    const review = await saveForecastReview(
+      params.eventId,
+      revision,
+      locals.user.email,
+      input,
+      url.pathname,
+    );
     return Response.json(
-      { ok: true, status: input.status },
+      { ok: true, status: review.status, alertStatus: review.alert_status },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : 'Could not save review.' },
+      {
+        error: error instanceof Error ? error.message : 'Could not save review.',
+      },
       { status: 400, headers: { 'Cache-Control': 'no-store' } },
     );
   }
