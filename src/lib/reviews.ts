@@ -14,6 +14,13 @@ export const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
   REVIEWED_FOR_ALERT: 'Reviewed — prepare alert',
 };
 
+export const REVIEW_STATUS_STYLES: Record<ReviewStatus, string> = {
+  PENDING_REVIEW: 'border-amber-300 bg-amber-50 text-amber-800',
+  DRAFT: 'border-blue-200 bg-blue-50 text-blue-700',
+  REVIEWED_NO_ALERT: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+  REVIEWED_FOR_ALERT: 'border-primary/20 bg-accent text-primary',
+};
+
 export const REVIEW_TEMPLATES = [
   {
     label: 'Generally consistent with observations',

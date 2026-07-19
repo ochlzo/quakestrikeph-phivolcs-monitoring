@@ -15,15 +15,16 @@ import {
 import type { EarthquakeMarker } from '@/data/earthquakes';
 import { countActiveMapFilters, type EarthquakeMapFilters } from '@/lib/earthquake-map-filters';
 import { sanitizeSearchInput } from '@/lib/input-security';
-import { REVIEW_STATUS_LABELS, type ReviewStatus } from '@/lib/reviews';
+import {
+  REVIEW_STATUS_LABELS,
+  REVIEW_STATUS_STYLES,
+  type ReviewStatus,
+} from '@/lib/reviews';
 import { cn } from '@/lib/utils';
 
 const STATUS_STYLE: Record<ReviewStatus | 'NO_FORECAST', string> = {
   NO_FORECAST: 'bg-muted text-muted-foreground',
-  PENDING_REVIEW: 'border-amber-300 bg-amber-50 text-amber-800',
-  DRAFT: 'border-blue-200 bg-blue-50 text-blue-700',
-  REVIEWED_NO_ALERT: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  REVIEWED_FOR_ALERT: 'border-primary/20 bg-accent text-primary',
+  ...REVIEW_STATUS_STYLES,
 };
 
 export type EventSidebarPanelProps = {

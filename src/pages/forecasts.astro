@@ -9,7 +9,12 @@ import { ALERT_STATUS_LABELS, type AlertStatus } from '@/lib/alerts';
 import { getForecastPage, type ForecastListRow } from '@/lib/portal-data';
 import { FORECAST_LIKELIHOODS } from '@/lib/earthquake-map-filters';
 import { MAGNITUDE_RANGE_OPTIONS, magnitudeSelectionsToRanges } from '@/lib/magnitude-ranges';
-import { REVIEW_STATUSES, REVIEW_STATUS_LABELS, type ReviewStatus } from '@/lib/reviews';
+import {
+  REVIEW_STATUSES,
+  REVIEW_STATUS_LABELS,
+  REVIEW_STATUS_STYLES,
+  type ReviewStatus,
+} from '@/lib/reviews';
 import {
   allowedValues,
   dateParam,
@@ -299,7 +304,7 @@ const alertStatusClass: Record<AlertStatus, string> = {
                             : `${(item.aftershock_24h * 100).toFixed(1)}%`}
                         </td>
                         <td class="p-3">
-                          <Badge className="bg-accent text-primary">
+                          <Badge className={REVIEW_STATUS_STYLES[item.review_status]}>
                             {REVIEW_STATUS_LABELS[item.review_status]}
                           </Badge>
                         </td>
