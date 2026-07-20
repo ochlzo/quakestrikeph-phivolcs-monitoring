@@ -207,7 +207,12 @@ export async function getForecastPage(options: {
 export async function getForecastCase(eventId: string): Promise<ForecastCase | null> {
   const supabase = getSupabaseAdmin();
   const [eventResult, forecastResult] = await Promise.all([
-    supabase.from('RawEarthquakeEvents').select(EVENT_FIELDS).eq('id', eventId).maybeSingle(),
+    supabase
+      .from('RawEarthquakeEvents')
+      .select(EVENT_FIELDS)
+      .eq('id', eventId)
+      .in('source_status', ['CURRENT', 'HISTORICAL'])
+      .maybeSingle(),
     supabase
       .from('SeisPredictions_v1')
       .select(PREDICTION_FIELDS)
